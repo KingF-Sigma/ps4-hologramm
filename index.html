@@ -7,14 +7,17 @@
 <style>
   html, body { margin: 0; height: 100%; background: #05080d; overflow: hidden; font-family: system-ui, "Segoe UI", sans-serif; color: #bfefff; }
   canvas { display: block; }
-  #overlay { position: fixed; left: 16px; top: 16px; max-width: 380px; background: rgba(4, 18, 28, .82); border: 1px solid #1f6f8f; border-radius: 10px; padding: 14px 16px; backdrop-filter: blur(4px); }
+  #overlay { position: fixed; left: 16px; top: 16px; max-width: 400px; max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; background: rgba(4, 18, 28, .86); border: 1px solid #1f6f8f; border-radius: 10px; padding: 14px 16px; backdrop-filter: blur(4px); }
   #overlay h1 { margin: 0 0 6px; font-size: 18px; letter-spacing: .08em; color: #6fe6ff; }
+  #overlay h2 { margin: 12px 0 4px; font-size: 13px; letter-spacing: .08em; color: #ffb341; }
   #overlay p { margin: 6px 0; font-size: 13px; line-height: 1.45; }
-  #overlay ul { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5; }
-  #start { width: 100%; padding: 12px; margin-top: 6px; font-size: 16px; font-weight: 600; letter-spacing: .05em; color: #021019; background: #4fd8ff; border: 0; border-radius: 8px; cursor: pointer; }
+  #overlay ul { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+  #start { width: 100%; padding: 12px; margin-top: 8px; font-size: 16px; font-weight: 600; letter-spacing: .05em; color: #021019; background: #4fd8ff; border: 0; border-radius: 8px; cursor: pointer; }
   #start:disabled { background: #33505c; color: #8aa; cursor: default; }
   #msg { margin-top: 8px; font-size: 12px; color: #ffb35c; }
   #hide { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #6fe6ff; font-size: 16px; cursor: pointer; }
+  kbd { background: #123; border: 1px solid #2a5a6f; border-radius: 3px; padding: 0 4px; font-size: 12px; }
+  @media (max-width: 480px) { #overlay { left: 16px; right: 16px; max-width: none; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -27,13 +30,20 @@
 <div id="overlay">
   <button id="hide" title="Ausblenden">✕</button>
   <h1>PS4 · HOLOGRAMM</h1>
-  <p>Setz die Quest auf und drück den Knopf. Das Hologramm erscheint vor dir im Raum (Passthrough).</p>
+  <p>Eine PlayStation 4 (Originalmodell CUH-1000) als begehbares Hologramm mit 24 Bauteilen. Setz die Meta Quest auf und drück den Knopf. Die Konsole erscheint dann vor dir im Raum.</p>
+  <h2>HÄNDE</h2>
   <ul>
-    <li><b>Teil greifen:</b> Daumen + Zeigefinger an einem Teil zusammendrücken, rausziehen, drehen, loslassen. Wenn du ein Teil nah an seinem Platz loslässt, rastet es wieder ein.</li>
-    <li><b>Aufziehen:</b> mit beiden Händen gleichzeitig ins Modell greifen und die Hände auseinanderziehen. Zusammenschieben baut die PS4 wieder zusammen.</li>
-    <li><b>Verschieben/Drehen:</b> den leuchtenden Sockelring greifen. Mit zwei Händen am Ring skalierst du.</li>
-    <li><b>Knöpfe:</b> mit dem Zeigefinger antippen oder aus der Ferne anpinchen.</li>
+    <li><b>Teil greifen:</b> Daumen und Zeigefinger an einem Teil zusammendrücken, rausziehen, drehen und loslassen. Nah an seinem Platz losgelassen, rastet es wieder ein.</li>
+    <li><b>Aufziehen:</b> mit beiden Händen gleichzeitig ins Modell greifen und auseinanderziehen.</li>
+    <li><b>Verschieben/Drehen:</b> den Sockelring greifen. Zwei Hände am Ring = größer/kleiner.</li>
+    <li><b>Knöpfe & Teileliste:</b> mit dem Finger antippen oder aus der Ferne anpinchen.</li>
   </ul>
+  <h2>ZUM ENTDECKEN</h2>
+  <ul>
+    <li><b>Fluss:</b> zeigt als Animation, wie Luft, Strom und Daten durch die Konsole laufen.</li>
+    <li><b>Maße, Beschriftung, Gehäuse ausblenden, echte Ansicht</b></li>
+  </ul>
+  <p style="opacity:.75">Am PC: Maus zum Drehen, Klick auf Teile. <kbd>E</kbd> aufziehen · <kbd>F</kbd> Fluss · <kbd>H</kbd> Ansicht · <kbd>G</kbd> Gehäuse · <kbd>M</kbd> Maße · <kbd>L</kbd> Beschriftung</p>
   <button id="start">Hologramm starten</button>
   <div id="msg"></div>
 </div>
@@ -42,8 +52,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// ---------------------------------------------------------------- Grundgerüst
+// ================================================================ Grundgerüst
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -57,9 +68,9 @@ scene.background = deskBg;
 const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 50);
-camera.position.set(0.25, 1.45, 1.25);
+camera.position.set(0.15, 1.55, 1.55);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.15, 0);
+controls.target.set(0, 1.2, 0);
 controls.update();
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4048, 1.3));
@@ -73,30 +84,44 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ---------------------------------------------------------------- Materialien
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const ONE = V(1, 1, 1);
+function rng(seed) {
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// ================================================================ Materialien
 const clock = { t: 0 };
 const HOLO = new THREE.Color(0x3fd6ff), GOLD = new THREE.Color(0xffb341);
 
-function makeHolo() {
+function makeHolo(map) {
   return new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: HOLO.clone() }, uTime: { value: 0 }, uGlow: { value: 1 }, uOpacity: { value: 1 } },
+    defines: map ? { USE_TEX: '' } : {},
+    uniforms: { uColor: { value: HOLO.clone() }, uTime: { value: 0 }, uGlow: { value: 1 }, uOpacity: { value: 1 }, uMap: { value: map || null } },
     vertexShader: `
-      varying vec3 vN; varying vec3 vW;
+      varying vec3 vN; varying vec3 vW; varying vec2 vUv;
       void main() {
+        vUv = uv;
         vec4 w = modelMatrix * vec4(position, 1.0);
         vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal);
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: `
-      uniform vec3 uColor; uniform float uTime; uniform float uGlow; uniform float uOpacity;
-      varying vec3 vN; varying vec3 vW;
+      uniform vec3 uColor; uniform float uTime; uniform float uGlow; uniform float uOpacity; uniform sampler2D uMap;
+      varying vec3 vN; varying vec3 vW; varying vec2 vUv;
       void main() {
         vec3 v = normalize(cameraPosition - vW);
         float fr = pow(1.0 - abs(dot(normalize(vN), v)), 2.0);
         float scan = smoothstep(0.55, 1.0, sin(vW.y * 260.0 - uTime * 3.0) * 0.5 + 0.5);
         float flick = 0.94 + 0.06 * sin(uTime * 37.0 + vW.x * 40.0);
         float a = (0.07 + fr * 0.7 + scan * 0.07) * uGlow * uOpacity * flick;
-        gl_FragColor = vec4(uColor * (0.55 + fr * 0.9) + scan * 0.06, a);
+        vec3 col = uColor * (0.55 + fr * 0.9) + scan * 0.06;
+        #ifdef USE_TEX
+          vec4 tx = texture2D(uMap, vUv);
+          col = mix(col, tx.rgb * 1.4, tx.a * 0.6);
+          a += tx.a * 0.5 * uGlow * uOpacity;
+        #endif
+        gl_FragColor = vec4(col, a);
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   });
@@ -105,28 +130,120 @@ function makeEdge() {
   return new THREE.LineBasicMaterial({ color: 0x7fe9ff, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
 }
 
+// --- Leiterbahnen-Textur fürs Mainboard (prozedural, oben liegt die Vorderseite der Konsole)
+const BX = x => (x + 127.5) / 255 * 1024, BZ = z => (z + 145) / 280 * 1024;
+function pcbCanvas(real) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 1024;
+  const g = c.getContext('2d');
+  const r = rng(7);
+  if (real) { g.fillStyle = '#1d5b30'; g.fillRect(0, 0, 1024, 1024); }
+  const trace = real ? 'rgba(96,178,100,0.85)' : 'rgba(110,230,255,0.45)';
+  const silk = real ? 'rgba(236,240,228,0.92)' : 'rgba(210,250,255,0.85)';
+  const pad = real ? '#caa24c' : 'rgba(255,205,130,0.75)';
+  g.lineCap = 'round';
+  // Speicherbusse APU → GDDR5 (je 10 parallele Leitungen)
+  const apu = [BX(20), BZ(15)];
+  g.strokeStyle = trace; g.lineWidth = 1.4;
+  for (const [dx, dz] of RAM_POS) {
+    const t = [BX(20 + dx), BZ(15 + dz)];
+    const ang = Math.atan2(t[1] - apu[1], t[0] - apu[0]) + Math.PI / 2;
+    for (let k = -5; k < 5; k++) {
+      const ox = Math.cos(ang) * k * 3, oy = Math.sin(ang) * k * 3;
+      g.beginPath(); g.moveTo(apu[0] + ox, apu[1] + oy); g.lineTo(t[0] + ox, t[1] + oy); g.stroke();
+    }
+  }
+  // zufällige Leiterbahnen im 45°-Raster
+  for (let i = 0; i < 320; i++) {
+    let x = r() * 1024, y = r() * 1024, dir = Math.floor(r() * 8);
+    g.lineWidth = r() < 0.2 ? 3 : 1.3;
+    g.beginPath(); g.moveTo(x, y);
+    const segs = 2 + Math.floor(r() * 3);
+    for (let s = 0; s < segs; s++) {
+      const len = 20 + r() * 110, a = dir * Math.PI / 4;
+      x += Math.cos(a) * len; y += Math.sin(a) * len; g.lineTo(x, y);
+      dir = (dir + (r() < 0.5 ? 1 : 7)) % 8;
+    }
+    g.stroke();
+    g.fillStyle = pad; g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill();
+  }
+  // Durchkontaktierungen
+  g.fillStyle = pad;
+  for (let i = 0; i < 400; i++) { g.beginPath(); g.arc(r() * 1024, r() * 1024, 1.6, 0, 7); g.fill(); }
+  // Befestigungslöcher
+  g.strokeStyle = pad; g.lineWidth = 5;
+  for (const [x, z] of BOARD_HOLES) { g.beginPath(); g.arc(BX(x), BZ(z), 11, 0, 7); g.stroke(); }
+  // Bestückungsdruck
+  g.strokeStyle = silk; g.fillStyle = silk; g.lineWidth = 2;
+  const outline = (x, z, w, d) => g.strokeRect(BX(x - w / 2) - 4, BZ(z - d / 2) - 4, w / 255 * 1024 + 8, d / 280 * 1024 + 8);
+  outline(20, 15, 42.5, 42.5);
+  for (const [dx, dz] of RAM_POS) { const f = Math.abs(dz) > 30; outline(20 + dx, 15 + dz, f ? 14 : 12, f ? 12 : 14); }
+  outline(88, -30, 21, 21); outline(88, 0, 10, 13); outline(10, -112, 12, 12); outline(105, 60, 24, 22);
+  g.font = 'bold 22px monospace';
+  const txt = (s, x, z, size = 22) => { g.font = `bold ${size}px monospace`; g.fillText(s, BX(x), BZ(z)); };
+  txt('U1', -8, -12); txt('APU', 36, -12);
+  txt('U2', 76, -44); txt('SB', 100, -44);
+  txt('U3', 78, 12); txt('U4', 0, -120); txt('HDMI', 20, -120, 18);
+  txt('BT1', 92, 76); txt('CR2032', 92, 84, 16);
+  txt('SAA-001', 25, 110, 34);
+  txt('SONY COMPUTER ENTERTAINMENT INC.', 0, 122, 16);
+  txt('VR1', -70, -18); txt('CN1 SATA', -75, 34, 16); txt('CN2 FAN', -40, -82, 16);
+  txt('PWR 12V', 88, -52, 16); txt('FRONT', -45, 128, 16);
+  for (let i = 0; i < 40; i++) txt('C' + (100 + Math.floor(r() * 800)), -120 + r() * 240, -135 + r() * 260, 12);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+const RAM_POS = [[-42, -14], [-42, 14], [42, -14], [42, 14], [-14, -42], [14, -42], [-14, 42], [14, 42]];
+const BOARD_HOLES = [[-120, -135], [120, -135], [-120, 125], [120, 125], [-45, 60], [75, 80], [60, -80], [-110, -10]];
+
 const REAL_DEF = {
-  black:  { color: 0x141518, roughness: 0.75 },
-  gloss:  { color: 0x08080a, roughness: 0.08, metalness: 0.1 },
-  pcb:    { color: 0x1c5a2e, roughness: 0.55 },
-  pcb2:   { color: 0x103a1f, roughness: 0.5 },
-  chip:   { color: 0x1b1b1d, roughness: 0.45 },
-  die:    { color: 0x4a4e66, roughness: 0.15, metalness: 0.6 },
-  metal:  { color: 0xaeb3ba, roughness: 0.35, metalness: 0.9 },
-  alu:    { color: 0xd4d8dc, roughness: 0.3, metalness: 0.85 },
-  copper: { color: 0xc8703a, roughness: 0.28, metalness: 1 },
-  port:   { color: 0x0a0a0c, roughness: 0.6 },
-  psu:    { color: 0x2b2d31, roughness: 0.6, metalness: 0.3 },
-  label:  { color: 0xe6e6e0, roughness: 0.8 },
-  disc:   { color: 0xdad9ec, roughness: 0.1, metalness: 1 },
-  cap:    { color: 0x2b3b8f, roughness: 0.4, metalness: 0.4 },
-  light:  { color: 0x1d5cff, emissive: 0x2f7dff, emissiveIntensity: 2.2, roughness: 0.3 },
+  black:   { color: 0x141518, roughness: 0.75 },
+  gloss:   { color: 0x060607, roughness: 0.06, metalness: 0.15 },
+  pcb:     { color: 0x1c5a2e, roughness: 0.55 },
+  pcb2:    { color: 0x103a1f, roughness: 0.5 },
+  pcbBrown:{ color: 0x8f6a3c, roughness: 0.7 },
+  chip:    { color: 0x1b1b1d, roughness: 0.45 },
+  chipcap: { color: 0x8a5a3a, roughness: 0.5 },
+  die:     { color: 0x4a4e66, roughness: 0.12, metalness: 0.7 },
+  metal:   { color: 0xaeb3ba, roughness: 0.35, metalness: 0.9 },
+  metal2:  { color: 0x7d838b, roughness: 0.45, metalness: 0.85 },
+  alu:     { color: 0xd4d8dc, roughness: 0.3, metalness: 0.85 },
+  copper:  { color: 0xc8703a, roughness: 0.28, metalness: 1 },
+  gold:    { color: 0xe0b050, roughness: 0.25, metalness: 1 },
+  port:    { color: 0x0a0a0c, roughness: 0.6 },
+  white:   { color: 0xe8e4d8, roughness: 0.6 },
+  rubber:  { color: 0x202022, roughness: 0.95 },
+  psu:     { color: 0x2b2d31, roughness: 0.6, metalness: 0.3 },
+  label:   { color: 0xe6e6e0, roughness: 0.8 },
+  disc:    { color: 0xdad9ec, roughness: 0.1, metalness: 1 },
+  discData:{ color: 0x9ea6ff, roughness: 0.05, metalness: 1 },
+  discLabel:{ color: 0x1c3f96, roughness: 0.6 },
+  discClear:{ color: 0xcfd8e0, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.5 },
+  cap:     { color: 0x2b3b8f, roughness: 0.4, metalness: 0.4 },
+  capBlack:{ color: 0x1e1e22, roughness: 0.45, metalness: 0.3 },
+  choke:   { color: 0x303236, roughness: 0.5, metalness: 0.4 },
+  ferrite: { color: 0x3a3a3e, roughness: 0.7 },
+  transformer: { color: 0xd8b23a, roughness: 0.6 },
+  glass:   { color: 0xddeeff, roughness: 0.1, transparent: true, opacity: 0.5 },
+  lens:    { color: 0x3050ff, roughness: 0.05, metalness: 0.3 },
+  magnet:  { color: 0x55585e, roughness: 0.4, metalness: 0.8 },
+  flex:    { color: 0xc8812a, roughness: 0.5 },
+  wire:    { color: 0x151515, roughness: 0.6 },
+  wireY:   { color: 0xe0c020, roughness: 0.6 },
+  usbblue: { color: 0x1f5fff, roughness: 0.5 },
+  lightguide: { color: 0x9ecbff, roughness: 0.2, transparent: true, opacity: 0.55 },
+  light:   { color: 0x1d5cff, emissive: 0x2f7dff, emissiveIntensity: 2.2, roughness: 0.3 },
+  led:     { color: 0xffffff, emissive: 0x88c8ff, emissiveIntensity: 3 },
 };
 const REAL = {};
 for (const [k, d] of Object.entries(REAL_DEF)) REAL[k] = new THREE.MeshStandardMaterial({ ...d, side: THREE.DoubleSide });
+const pcbTexReal = pcbCanvas(true), pcbTexHolo = pcbCanvas(false);
+REAL.pcbTex = new THREE.MeshStandardMaterial({ map: pcbTexReal, roughness: 0.55, side: THREE.DoubleSide });
 
-// ---------------------------------------------------------------- Modell-Aufbau
-// Einheiten in mm, Original-PS4 (CUH-1000): 275 × 53 × 305 mm. Vorne = +z.
+// ================================================================ Modell-Baukasten
+// Einheiten in mm, Original-PS4 (CUH-1000): 275 × 53 × 305 mm. Vorne = +z, rechts = +x.
 const W2 = 137.5, D2 = 152.5, LEAN = 12 / 53, A = Math.atan(LEAN);
 const zF = y => D2 + y * LEAN, zB = y => -D2 + y * LEAN;
 
@@ -140,252 +257,648 @@ ps4.scale.setScalar(0.001);
 ps4.position.y = 0.03;
 modelRoot.add(ps4);
 
-const parts = [];
-const allMeshes = [];
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const parts = [], byId = {}, allMeshes = [];
+const CATS = ['Gehäuse', 'Strom', 'Kühlung', 'Elektronik', 'Laufwerke'];
 
-function makePart(id, name, home, dir, info) {
+function makePart(id, cat, name, home, dir, info) {
   const group = new THREE.Group();
   group.position.copy(home);
   ps4.add(group);
-  const p = { id, name, group, home: home.clone(), dir, info, meshes: [], detached: false, grabbed: false,
-              holoMat: makeHolo(), edgeMat: makeEdge(), hover: 0 };
-  parts.push(p);
+  const p = { id, cat, name, group, home: home.clone(), dir, info, prims: [], colliders: [], sub: null,
+              detached: false, grabbed: false, hover: 0, holoMat: makeHolo(), edgeMat: makeEdge(), mats: [] };
+  p.mats.push(p.holoMat);
+  parts.push(p); byId[id] = p;
   return p;
 }
-function add(p, geom, x, y, z, real, rot) {
-  const m = new THREE.Mesh(geom, p.holoMat);
-  m.position.set(x - p.home.x, y - p.home.y, z - p.home.z);
-  if (rot) m.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
-  geom.computeBoundingBox();
-  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geom, 25), p.edgeMat);
-  m.add(e);
-  m.userData = { part: p, real: REAL[real], edges: e };
-  p.group.add(m);
-  p.meshes.push(m);
-  allMeshes.push(m);
-  return m;
+function startSub(p, x, y, z, spin) { // Untergruppe, die sich drehen darf (Lüfter, Disc, Platter)
+  const g = new THREE.Group();
+  g.position.set(x - p.home.x, y - p.home.y, z - p.home.z);
+  p.group.add(g);
+  p.sub = g;
+  p.spins = p.spins || [];
+  p.spins.push({ g, speed: spin });
 }
-const box = (p, w, h, d, x, y, z, real, rot) => add(p, new THREE.BoxGeometry(w, h, d), x, y, z, real, rot);
-const cyl = (p, r, h, x, y, z, real, rot, seg = 24) => add(p, new THREE.CylinderGeometry(r, r, h, seg), x, y, z, real, rot);
-function sideGeom(y0, y1, t) { // Seitenwand als Parallelogramm (die PS4 ist schräg)
+const _q = new THREE.Quaternion(), _e = new THREE.Euler();
+function prim(p, geom, x, y, z, real, rot, edgeAngle = 25) {
+  const target = p.sub || p.group;
+  const pos = V(x, y, z).sub(p.home);
+  if (p.sub) pos.sub(p.sub.position);
+  _q.setFromEuler(_e.set(rot?.[0] || 0, rot?.[1] || 0, rot?.[2] || 0));
+  const m = new THREE.Matrix4().compose(pos, _q, ONE);
+  p.prims.push({ geom, m, real, target, edgeAngle });
+  geom.computeBoundingBox();
+  const cm = p.sub ? new THREE.Matrix4().makeTranslation(p.sub.position.x, p.sub.position.y, p.sub.position.z).multiply(m) : m.clone();
+  p.colliders.push({ box: geom.boundingBox.clone(), m: cm, inv: cm.clone().invert() });
+}
+const box = (p, w, h, d, x, y, z, real, rot) => prim(p, new THREE.BoxGeometry(w, h, d), x, y, z, real, rot);
+const cyl = (p, r, h, x, y, z, real, rot, seg = 20) => prim(p, new THREE.CylinderGeometry(r, r, h, seg), x, y, z, real, rot);
+const ring = (p, r0, r1, x, y, z, real, seg = 48) => prim(p, new THREE.RingGeometry(r0, r1, seg).rotateX(-Math.PI / 2), x, y, z, real);
+const tube = (p, pts, r, real, seg = 48) => prim(p, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(a => V(...a))), seg, r, 10), 0, 0, 0, real, null, 60);
+const torus = (p, R, r, x, y, z, real, rot) => prim(p, new THREE.TorusGeometry(R, r, 10, 28), x, y, z, real, rot, 60);
+function sideGeom(y0, y1, t) { // Seitenwand als Parallelogramm (die PS4 ist schräg geschnitten)
   const s = new THREE.Shape();
   s.moveTo(zB(y0), y0); s.lineTo(zF(y0), y0); s.lineTo(zF(y1), y1); s.lineTo(zB(y1), y1); s.closePath();
   const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false });
   g.rotateY(-Math.PI / 2); g.translate(t / 2, 0, 0);
   return g;
 }
-const slant = (p, w, y0, y1, t, front, real) => {
+const slant = (p, w, y0, y1, t, front, real, x = 0) => {
   const ym = (y0 + y1) / 2, h = (y1 - y0) / Math.cos(A);
-  return box(p, w, h, t, 0, ym, front ? zF(ym) - t / 2 : zB(ym) + t / 2, real, [A, 0, 0]);
+  box(p, w, h, t, x, ym, front ? zF(ym) - t / 2 : zB(ym) + t / 2, real, [A, 0, 0]);
 };
 
-// --- Unteres Gehäuse
+// Nach dem Aufbau: alle Grundformen eines Teils pro Material zu einem Mesh verschmelzen (wenige Draw-Calls für die Quest)
+function finalize(p) {
+  const groups = new Map();
+  for (const pr of p.prims) {
+    const key = pr.real;
+    if (!groups.has(pr.target)) groups.set(pr.target, new Map());
+    const byMat = groups.get(pr.target);
+    if (!byMat.has(key)) byMat.set(key, []);
+    byMat.get(key).push(pr);
+  }
+  for (const [target, byMat] of groups) {
+    for (const [key, list] of byMat) {
+      const geoms = list.map(pr => { const g = pr.geom.index ? pr.geom.toNonIndexed() : pr.geom.clone(); for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); return g.applyMatrix4(pr.m); });
+      const merged = mergeGeometries(geoms, false);
+      let holo = p.holoMat;
+      if (key === 'pcbTex') { holo = makeHolo(pcbTexHolo); p.mats.push(holo); }
+      const mesh = new THREE.Mesh(merged, holo);
+      const edges = new THREE.LineSegments(mergeGeometries(list.map(pr => new THREE.EdgesGeometry(pr.geom, pr.edgeAngle).applyMatrix4(pr.m)), false), p.edgeMat);
+      mesh.add(edges);
+      mesh.userData = { part: p, real: REAL[key], holo, edges };
+      target.add(mesh);
+      allMeshes.push(mesh);
+    }
+  }
+  const b = new THREE.Box3();
+  for (const c of p.colliders) b.union(c.box.clone().applyMatrix4(c.m));
+  p.localBox = b;
+  p.center = b.getCenter(new THREE.Vector3());
+  const s = b.getSize(new THREE.Vector3());
+  p.volume = s.x * s.y * s.z;
+  p.prims = null;
+}
+
+// ================================================================ Die Bauteile
+// ---------- GEHÄUSE
 {
-  const p = makePart('bottom', 'Unteres Gehäuse', V(0, 12, 0), V(0, -130, 0), {
-    sub: 'Bodenwanne aus Kunststoff',
-    text: 'Die untere Hälfte trägt alles: Mainboard, Lüfter und Festplattenschacht sind hier verschraubt. Zwischen oberer und unterer Hälfte liegt die dunkle Fuge, durch die die PS4 Luft ansaugt.',
-    facts: ['Maße komplett: 275 × 53 × 305 mm', 'Gewicht der ganzen Konsole: ca. 2,8 kg', 'Luft kommt seitlich rein und hinten raus'] });
+  const p = makePart('top', 'Gehäuse', 'Oberes Gehäuse', V(20, 41, 0), V(0, 300, 0), {
+    sub: 'Obere Gehäusehälfte mit Mattfläche und Lüftungsgitter',
+    text: 'Die obere Hälfte bildet die große matte Fläche und die schrägen Seiten. Vorne steckt der Einzugsschlitz für Discs, hinten das Lüftungsgitter, durch das die heiße Luft rausgeht. Innen versteifen Rippen die Haube.',
+    specs: [['Maße (ganze PS4)', '275 × 53 × 305 mm'], ['Gewicht (ganze PS4)', 'ca. 2,8 kg'], ['Material', 'Kunststoff, matt strukturiert'], ['Form', 'Parallelogramm (schräge Front und Rückseite)']],
+    fact: 'Die PS4 darf auch hochkant stehen. Sony hat dafür extra einen Standfuß verkauft.' });
+  box(p, 182.5, 2.5, 305, 46.25, 51.75, 51.75 * LEAN, 'black');
+  box(p, 2, 2.5, 300, -49.5, 51.75, 51.75 * LEAN, 'black');
+  slant(p, 275, 29, 50.5, 2.5, true, 'black');
+  slant(p, 275, 29, 50.5, 2.5, false, 'black');
+  prim(p, sideGeom(29, 50.5, 2.5), W2 - 1.25, 0, 0, 'black');
+  prim(p, sideGeom(29, 50.5, 2.5), -W2 + 1.25, 0, 0, 'black');
+  box(p, 125, 3, 1.2, 50, 38, zF(38) + 0.3, 'port', [A, 0, 0]);                          // Disc-Schlitz
+  for (let x = -120; x <= 120; x += 12) box(p, 3, 15, 3, x, 39.75, zB(39.75) - 0.6, 'port', [A, 0, 0]); // Lüftungsgitter
+  for (const x of [-20, 20, 60, 100]) box(p, 2, 6, 290, x, 47.5, 47.5 * LEAN, 'black');   // Versteifungsrippen
+  for (const [x, z] of [[-125, -135], [125, -135], [-125, 140], [125, 140]]) cyl(p, 4, 18, x, 41, z + 41 * LEAN, 'black', null, 12);
+  finalize(p);
+}
+{
+  const p = makePart('gloss', 'Gehäuse', 'Hochglanz-Abdeckung', V(-93, 51.75, 12), V(-70, 340, 0), {
+    sub: 'Abnehmbarer Deckel über dem Festplattenschacht',
+    text: 'Der glänzende Streifen links ist kein Deko-Element, sondern ein Deckel. Wenn man ihn nach links abschiebt, kommt der Festplattenschacht zum Vorschein. Kleine Rastnasen auf der Unterseite halten ihn fest.',
+    specs: [['Oberfläche', 'Klavierlack-Optik (Hochglanz)'], ['Befestigung', 'Rastnasen, ohne Schrauben'], ['Darunter', 'Festplatte im Metallrahmen']],
+    fact: 'Hochglanz sieht edel aus, zerkratzt aber sehr leicht. Deshalb haben spätere Modelle (ab CUH-1200) oben komplett matte Oberflächen.' });
+  box(p, 88.5, 2.5, 305, -93.25, 51.75, 51.75 * LEAN, 'gloss');
+  slant(p, 88.5, 44, 50.5, 2, true, 'gloss', -93.25);
+  slant(p, 88.5, 44, 50.5, 2, false, 'gloss', -93.25);
+  for (const z of [-110, -40, 40, 110]) box(p, 10, 3, 6, -93, 49, z + 49 * LEAN, 'black');
+  finalize(p);
+}
+{
+  const p = makePart('light', 'Gehäuse', 'Lichtleiste', V(-47, 47, 11), V(0, 320, 0), {
+    sub: 'LED-Streifen mit Lichtleiter',
+    text: 'Zwischen Hochglanz- und Mattfläche läuft die Lichtleiste. Eine kleine LED-Platine leuchtet in einen durchsichtigen Lichtleiter, der das Licht über die ganze Länge verteilt.',
+    specs: [['Blau pulsierend', 'PS4 startet'], ['Weiß', 'PS4 läuft'], ['Orange', 'Ruhemodus'], ['Rot blinkend', 'Überhitzung']],
+    fact: 'Blinkt sie nur blau und es kommt kein Bild, ist das der gefürchtete "Blue Light of Death". Oft steckt ein Problem mit HDMI, Netzteil oder Festplatte dahinter.' });
+  box(p, 4, 1.6, 298, -47, 52, 52 * LEAN, 'light');
+  box(p, 3, 8, 296, -47, 46.5, 46.5 * LEAN, 'lightguide');
+  box(p, 10, 1.2, 22, -47, 42, zF(42) - 22, 'pcb');
+  for (const dz of [-6, 0, 6]) box(p, 2.5, 1.2, 2.5, -47, 43.2, zF(42) - 22 + dz, 'led');
+  finalize(p);
+}
+{
+  const p = makePart('bottom', 'Gehäuse', 'Unteres Gehäuse', V(0, 12, 0), V(0, -150, 0), {
+    sub: 'Bodenwanne, trägt Mainboard und Festplattenschacht',
+    text: 'Die untere Hälfte ist das Fundament: Mainboard, Lüfter und Festplattenschacht sind hier verschraubt. Zwischen den beiden Hälften liegt die dunkle Fuge, durch die die PS4 frische Luft ansaugt. Hinten sind die Öffnungen für die Anschlüsse.',
+    specs: [['Füße', '4 Gummifüße'], ['Luft rein', 'vordere und seitliche Fuge'], ['Luft raus', 'hinten'], ['Anschlüsse hinten', 'HDMI, LAN, Optisch, AUX, Strom']],
+    fact: 'Hinten klebt ein Garantiesiegel über einer Schraube. Wer es beschädigt hat, hat bei Sony die Garantie riskiert.' });
   box(p, 271, 2, 301, 0, 1, 0, 'black');
   slant(p, 275, 2, 25, 2.5, true, 'black');
   slant(p, 275, 2, 25, 2.5, false, 'black');
-  add(p, sideGeom(2, 25, 2.5), W2 - 1.25, 0, 0, 'black');
-  add(p, sideGeom(2, 25, 2.5), -W2 + 1.25, 0, 0, 'black');
-  // Fuge (Luftschlitz) zwischen den Hälften
+  prim(p, sideGeom(2, 25, 2.5), W2 - 1.25, 0, 0, 'black');
+  prim(p, sideGeom(2, 25, 2.5), -W2 + 1.25, 0, 0, 'black');
   box(p, 261, 4 / Math.cos(A), 1.5, 0, 27, zF(27) - 8, 'port', [A, 0, 0]);
   box(p, 261, 4 / Math.cos(A), 1.5, 0, 27, zB(27) + 8, 'port', [A, 0, 0]);
   box(p, 1.5, 4, 288, W2 - 7, 27, 27 * LEAN, 'port');
   box(p, 1.5, 4, 288, -W2 + 7, 27, 27 * LEAN, 'port');
-  for (let i = 0; i < 8; i++) box(p, 220, 1.2, 3, 0, 2.6, -112 + i * 32, 'black');
-  for (const [x, z] of [[-110, -120], [110, -120], [-110, 120], [110, 120]]) cyl(p, 9, 2, x, -1, z, 'port');
+  for (let i = 0; i < 9; i++) box(p, 230, 1.2, 3, 10, 2.6, -120 + i * 30, 'black');
+  for (const [x, z] of [[-110, -120], [110, -120], [-110, 120], [110, 120]]) cyl(p, 10, 2.5, x, -1.2, z, 'rubber', null, 16);
+  for (const [x, z] of BOARD_HOLES) cyl(p, 4, 3.5, x, 3.5, z, 'black', null, 10);
+  box(p, 2, 8, 110, -59, 6, 62, 'black');                                            // Führung Festplattenschacht
+  for (const [x, w] of [[10, 17], [35, 18], [58, 11], [78, 12]]) box(p, w, 10, 1, x, 12, zB(12) - 0.2, 'port', [A, 0, 0]);
+  box(p, 9, 7, 0.4, 60, 20, zB(20) - 0.6, 'label', [A, 0, 0]);                       // Garantiesiegel
+  finalize(p);
 }
-// --- Oberes Gehäuse
 {
-  const p = makePart('top', 'Oberes Gehäuse', V(0, 41, 0), V(0, 270, 0), {
-    sub: 'Haube mit Hochglanz- und Mattfläche',
-    text: 'Das typische Design der ersten PS4: links ein Hochglanz-Streifen (darunter steckt die Festplatte), rechts die große matte Fläche. Dazwischen läuft die Lichtleiste, die in der Farbe des Controllers leuchtet.',
-    facts: ['Lichtleiste: blau = an, weiß = Ruhemodus-Übergang, orange = Ruhemodus', 'Vorne: Schlitz für Discs + Touch-Tasten für Power und Auswurf', 'Hinten: Lüftungsgitter'] });
-  box(p, 182.5, 2.5, 305, 46.25, 51.75, 51.75 * LEAN, 'black');
-  box(p, 88.5, 2.5, 305, -93.25, 51.75, 51.75 * LEAN, 'gloss');
-  box(p, 4, 1.6, 298, -47, 52, 52 * LEAN, 'light');
-  slant(p, 275, 29, 50.5, 2.5, true, 'black');
-  slant(p, 275, 29, 50.5, 2.5, false, 'black');
-  add(p, sideGeom(29, 50.5, 2.5), W2 - 1.25, 0, 0, 'black');
-  add(p, sideGeom(29, 50.5, 2.5), -W2 + 1.25, 0, 0, 'black');
-  box(p, 125, 3, 1.2, 50, 38, zF(38) + 0.3, 'port', [A, 0, 0]);          // Disc-Schlitz
-  for (let x = -120; x <= 120; x += 16) box(p, 3, 15, 3, x, 39.75, zB(39.75) - 0.6, 'port', [A, 0, 0]); // Lüftungsgitter
+  const p = makePart('front', 'Gehäuse', 'Front-Platine', V(-20, 27, 142), V(0, 0, 120), {
+    sub: '2 × USB 3.0 und die Touch-Tasten',
+    text: 'Eine kleine Platine vorne in der Fuge trägt die beiden USB-Buchsen. Daneben sitzen die Sensoren für die Power- und die Auswurf-Taste. Das sind keine echten Knöpfe, sondern Touch-Flächen. Über ein Flachbandkabel hängt alles am Mainboard.',
+    specs: [['USB', '2 × USB 3.0 (5 Gbit/s)'], ['Tasten', 'Power + Eject, kapazitiv'], ['Verbindung', 'Flachbandkabel zum Mainboard'], ['Laden', 'Controller lädt auch im Ruhemodus']],
+    fact: 'Die Touch-Tasten hat man oft aus Versehen berührt, und dann spuckte die PS4 die Disc aus. Ab CUH-1200 gab es deshalb echte Tasten.' });
+  box(p, 80, 1.5, 14, -30, 24, 142, 'pcb');
+  for (const x of [-45, -15]) { box(p, 14, 6, 15, x, 27.5, 145, 'metal'); box(p, 10, 1.6, 12, x, 27.5, 146, 'usbblue'); }
+  box(p, 24, 12, 1.2, 18, 34, 146, 'pcb');
+  for (const x of [12, 24]) box(p, 6, 6, 0.4, x, 34, 146.8, 'copper');
+  box(p, 12, 0.4, 40, -30, 23.2, 118, 'flex');
+  finalize(p);
 }
-// --- Mainboard
+
+// ---------- ELEKTRONIK
 {
-  const p = makePart('board', 'Mainboard', V(0, 6, -5), V(0, -55, 0), {
-    sub: 'Hauptplatine (SAA-001)',
-    text: 'Auf der Hauptplatine sitzt alles, was rechnet: die APU in der Mitte, drumherum der Grafikspeicher. Die Southbridge mit eigenem kleinen ARM-Prozessor kümmert sich um USB, Festplatte und Downloads im Ruhemodus.',
-    facts: ['Hinten: HDMI, Gigabit-LAN, optischer Audioausgang, AUX (PS-Kamera)', 'Southbridge mit eigenem ARM-Kern für Hintergrund-Downloads', '16 Speicherchips: 8 oben, 8 auf der Unterseite'] });
-  box(p, 255, 1.6, 280, 0, 6, -5, 'pcb');
-  box(p, 20, 2, 20, -60, 7.8, -50, 'chip');                                  // Southbridge
-  for (const [w, d, x, z] of [[10, 8, -85, -20], [8, 8, 70, 60], [14, 10, -30, 80], [9, 9, 95, -40], [12, 6, -100, 40], [7, 7, 60, -95]])
-    box(p, w, 1.5, d, x, 7.5, z, 'chip');
-  for (let i = 0; i < 6; i++) cyl(p, 3, 7, -20 + i * 9, 10.3, 70, 'cap', null, 12);
-  for (let i = 0; i < 4; i++) cyl(p, 3, 7, 80, 10.3, -10 + i * 9, 'cap', null, 12);
-  box(p, 15, 6, 10, -30, 9.8, -138, 'metal');   // HDMI
-  box(p, 16, 13, 14, -5, 13.3, -136, 'metal');  // LAN
-  box(p, 9, 9, 12, 18, 11.3, -137, 'port');     // optisch
-  box(p, 10, 8, 10, 38, 10.8, -138, 'port');    // AUX
-  for (const [x, z] of [[-115, -130], [115, -130], [-115, 120], [115, 120], [-40, 30], [80, -60]]) cyl(p, 4, 3, x, 8.3, z, 'metal', null, 12);
-}
-// --- APU
-{
-  const p = makePart('apu', 'APU – CPU + Grafik', V(20, 8, 15), V(0, 40, 0), {
-    sub: 'AMD-Chip "Liverpool"',
-    text: 'Das Herz der PS4: Prozessor und Grafikchip sitzen auf einem einzigen Stück Silizium. Deshalb heißt das Ding APU. Es wird richtig heiß und hängt deshalb direkt am Kupferblock des Kühlkörpers.',
-    facts: ['CPU: 8 Jaguar-Kerne mit 1,6 GHz', 'GPU: 18 Compute Units, 800 MHz, 1,84 TFLOPS', 'Gefertigt in 28 nm bei TSMC'] });
-  box(p, 42, 1.2, 42, 20, 7.4, 15, 'pcb2');
-  box(p, 19, 0.9, 18.5, 20, 8.45, 15, 'die');
-  for (const [x, z] of [[4, 0], [36, 0], [4, 30], [36, 30]]) box(p, 3, 0.8, 3, x, 8.4, z, 'chip');
-}
-// --- GDDR5
-{
-  const p = makePart('ram', 'GDDR5-Arbeitsspeicher', V(20, 7.4, 15), V(0, -25, 0), {
-    sub: '8 GB, gemeinsam für CPU und Grafik',
-    text: 'Die PS4 hat keinen getrennten Grafikspeicher: CPU und GPU teilen sich 8 GB schnellen GDDR5-Speicher. Das war 2013 für eine Konsole richtig viel und machte das Entwickeln einfacher.',
-    facts: ['8 GB GDDR5, 176 GB/s', '16 Chips à 512 MB (hier die 8 auf der Oberseite)', 'Ein Teil ist fürs Betriebssystem reserviert'] });
-  const pos = [[-42, -14], [-42, 14], [42, -14], [42, 14], [-14, -42], [14, -42], [-14, 42], [14, 42]];
-  for (const [dx, dz] of pos) {
-    const flip = Math.abs(dz) > 30;
-    box(p, flip ? 14 : 12, 1.2, flip ? 12 : 14, 20 + dx, 7.4, 15 + dz, 'chip');
+  const p = makePart('board', 'Elektronik', 'Mainboard', V(0, 6, -5), V(0, -55, 0), {
+    sub: 'Hauptplatine SAA-001',
+    text: 'Auf der Hauptplatine sitzt alles, was rechnet. In der Mitte die APU, drumherum der GDDR5-Speicher. Die feinen Leiterbahnen auf mehreren Lagen verbinden alles. Hinten sind die Anschlüsse aufgelötet, und an Steckern hängen Netzteil, Festplatte, Laufwerk, Lüfter und Front-Platine.',
+    specs: [['Bezeichnung', 'SAA-001 (erste PS4)'], ['Anschlüsse hinten', 'HDMI, Gigabit-LAN, Optisch (S/PDIF), AUX'], ['Stecker innen', 'Netzteil, SATA, Laufwerk, Lüfter, Front'], ['Größe', 'ca. 25,5 × 28 cm']],
+    fact: 'Spätere PS4-Modelle bekamen neue Mainboards mit kleinerer, sparsamerer APU. Die Platine wurde fast mit jeder Revision umgebaut.' });
+  box(p, 255, 1.6, 280, 0, 6, -5, 'pcbTex');
+  // Anschlüsse hinten
+  box(p, 15, 6, 11, 10, 9.8, -137, 'metal'); box(p, 11, 2, 9, 10, 9.8, -138, 'port');
+  box(p, 16, 13, 18, 35, 13.3, -134, 'metal'); box(p, 2, 2, 1, 30, 18, -143.2, 'led'); box(p, 2, 2, 1, 40, 18, -143.2, 'gold');
+  box(p, 9, 9, 12, 58, 11.3, -137, 'port');
+  box(p, 10, 8, 10, 78, 10.8, -138, 'port');
+  // Stecker innen
+  box(p, 7, 5, 18, -62, 9.3, 40, 'port');
+  box(p, 20, 4, 6, 70, 8.8, 20, 'white');
+  box(p, 24, 8, 10, 100, 10.8, -40, 'white');
+  for (let i = 0; i < 6; i++) box(p, 2.5, 6, 2.5, 91 + i * 3.6, 13, -40, 'gold');
+  box(p, 8, 5, 4, -30, 9.3, -80, 'white');
+  box(p, 14, 3, 5, -30, 8.3, 112, 'white');
+  box(p, 10, 3, 5, -95, 8.3, -105, 'white');
+  // Elkos bei Stromanschluss und Rand
+  for (let i = 0; i < 5; i++) cyl(p, 4, 9, 75, 11.3, -60 + i * 9, 'cap', null, 12);
+  for (let i = 0; i < 4; i++) cyl(p, 3, 7, 115, 10.3, -20 + i * 8, 'cap', null, 12);
+  // Quarz, kleine ICs
+  box(p, 5, 1.5, 3, 60, 7.5, -20, 'metal');
+  for (const [w, d, x, z] of [[8, 8, 60, 88], [7, 7, 108, -100], [9, 6, 40, -95], [6, 6, -15, 85], [10, 8, -10, -60]]) box(p, w, 1.4, d, x, 7.5, z, 'chip');
+  // viele SMD-Bauteile außerhalb der großen Bauteile
+  const keep = [[-30, 70, -35, 65], [-140, -58, 5, 120], [-100, -20, -100, -20], [-100, -20, -145, -98], [-75, -35, -15, 72],
+                [72, 118, -45, 12], [0, 90, -145, -126], [90, 120, 45, 75], [85, 115, -50, -30], [60, 125, -65, 0], [-5, 25, -120, -100], [-70, 10, 105, 125]];
+  const r = rng(11);
+  let n = 0;
+  while (n < 140) {
+    const x = -122 + r() * 244, z = -140 + r() * 270;
+    if (keep.some(([a, b, c, d]) => x > a && x < b && z > c && z < d)) continue;
+    const rot = r() < 0.5 ? 0 : Math.PI / 2;
+    if (r() < 0.8) box(p, 2 + r() * 2, 0.8, 1.2 + r(), x, 7.2, z, r() < 0.5 ? 'chipcap' : 'chip', [0, rot, 0]);
+    else cyl(p, 2, 4, x, 8.8, z, 'cap', null, 10);
+    n++;
   }
+  for (const [x, z] of BOARD_HOLES) cyl(p, 5, 0.3, x, 6.9, z, 'gold', null, 16);
+  finalize(p);
 }
-// --- Kühlkörper
 {
-  const p = makePart('cooler', 'Kühlkörper', V(25, 18, -50), V(0, 95, 0), {
-    sub: 'Kupferblock, Heatpipes, Alu-Lamellen',
-    text: 'Der Kupferblock liegt mit Wärmeleitpaste direkt auf der APU. Vier Heatpipes ziehen die Wärme nach hinten zu den Aluminium-Lamellen, und dort bläst der Lüfter sie aus der Konsole raus.',
-    facts: ['Alte PS4 laut? Meist ist die Wärmeleitpaste ausgetrocknet', 'Heatpipes: Kupferrohre mit verdampfender Flüssigkeit innen', 'Staub zwischen den Lamellen = heiß + laut'] });
-  box(p, 46, 5, 46, 20, 11.8, 15, 'copper');
-  for (const x of [5, 15, 25, 35]) cyl(p, 3, 118, x, 16, -44, 'copper', [Math.PI / 2, 0, 0], 12);
-  for (let x = -35; x <= 90; x += 5) box(p, 1, 17, 40, x, 19.5, -110, 'alu');
-  box(p, 128, 1, 40, 27.5, 28.5, -110, 'alu');
+  const p = makePart('apu', 'Elektronik', 'APU (CPU + Grafik)', V(20, 8, 15), V(0, 35, 0), {
+    sub: 'AMD-Chip "Liverpool", CPU und GPU auf einem Chip',
+    text: 'Das Herz der PS4. Prozessor und Grafikchip sitzen auf einem einzigen Stück Silizium, deshalb heißt das Ding APU (Accelerated Processing Unit). Der glänzende Die in der Mitte ist der eigentliche Chip. Er sitzt auf einem grünen Träger, und winzige Kondensatoren drumherum glätten die Spannung.',
+    specs: [['CPU', '8 × AMD Jaguar, 1,6 GHz'], ['GPU', 'GCN, 18 CUs, 1152 Shader, 800 MHz'], ['Leistung', '1,84 TFLOPS'], ['Fertigung', '28 nm, TSMC'], ['Chipfläche', 'ca. 348 mm²']],
+    fact: 'Spiele durften anfangs nur 6 der 8 CPU-Kerne benutzen, den Rest brauchte das System. Später gab Sony einen Teil des 7. Kerns frei.' });
+  box(p, 42.5, 1.2, 42.5, 20, 7.4, 15, 'pcb2');
+  box(p, 19, 0.9, 18.3, 20, 8.45, 15, 'die');
+  const r = rng(3);
+  for (let i = 0; i < 28; i++) {
+    const side = i % 4, t = -16 + (Math.floor(i / 4) * 5.3);
+    const [x, z] = side === 0 ? [t, -17] : side === 1 ? [t, 17] : side === 2 ? [-17, t] : [17, t];
+    box(p, 1.8, 0.6, 1, 20 + x, 8.3, 15 + z, 'chipcap', [0, side > 1 ? Math.PI / 2 : 0, 0]);
+  }
+  finalize(p);
 }
-// --- Lüfter
+function ramPart(id, name, y, dir, top) {
+  const p = makePart(id, 'Elektronik', name, V(20, y, 15), dir, {
+    sub: top ? '8 der 16 Speicherchips, rund um die APU' : 'Die anderen 8 Chips, auf der Rückseite der Platine',
+    text: 'Die PS4 hat keinen getrennten Grafikspeicher: CPU und GPU teilen sich 8 GB schnellen GDDR5-Speicher (hUMA). Die Chips sitzen ganz dicht an der APU, damit die Leitungen kurz bleiben. 8 liegen oben, 8 genau gegenüber auf der Unterseite.',
+    specs: [['Gesamt', '8 GB GDDR5'], ['Chips', '16 × 512 MB (8 oben, 8 unten)'], ['Bus', '256 Bit'], ['Datenrate', '5,5 Gbit/s pro Leitung'], ['Bandbreite', '176 GB/s']],
+    fact: 'Eigentlich waren nur 4 GB geplant. Kurz vor der Vorstellung im Februar 2013 hat Sony auf 8 GB verdoppelt, und die Entwickler haben gejubelt.' });
+  for (const [dx, dz] of RAM_POS) {
+    const f = Math.abs(dz) > 30;
+    box(p, f ? 14 : 12, 1.2, f ? 12 : 14, 20 + dx, y, 15 + dz, 'chip');
+    box(p, 1.5, 0.2, 1.5, 20 + dx - (f ? 5 : 4), y + (top ? 0.65 : -0.65), 15 + dz - (f ? 4 : 5), 'label');
+  }
+  finalize(p);
+}
+ramPart('ramT', 'GDDR5 (Oberseite)', 7.4, V(0, -25, 0), true);
+ramPart('ramB', 'GDDR5 (Unterseite)', 4.6, V(0, -95, 0), false);
 {
-  const p = makePart('fan', 'Lüfter', V(-80, 17, -85), V(-70, 60, -50), {
+  const p = makePart('vrm', 'Elektronik', 'Spannungswandler (VRM)', V(-52, 9, 28), V(-15, -25, 0), {
+    sub: 'Macht aus 12 V die rund 1 V für die APU',
+    text: 'Die APU braucht eine sehr niedrige, aber extrem saubere Spannung. Die Spannungswandler schalten dafür 12 V hunderttausende Male pro Sekunde ein und aus. Die Spulen (graue Klötze) und Kondensatoren glätten das zu einer ruhigen Gleichspannung. Mehrere Phasen teilen sich die Arbeit.',
+    specs: [['Eingang', '12 V vom Netzteil'], ['Ausgang', 'rund 1 V für die APU'], ['Bauteile', 'Spulen, MOSFETs, Elkos, Controller'], ['Prinzip', 'mehrphasiger Schaltregler']],
+    fact: 'Bei rund 1 V und ca. 100 W Leistung fließen zur APU um die 100 Ampere. Deshalb werden die Spannungswandler selbst warm.' });
+  for (let i = 0; i < 7; i++) { box(p, 9, 7, 9, -48, 10.3, -8 + i * 12, 'choke'); box(p, 5, 1.2, 6, -60, 7.4, -8 + i * 12, 'chip'); box(p, 5, 1.2, 6, -37, 7.4, -8 + i * 12, 'chip'); }
+  for (let i = 0; i < 6; i++) cyl(p, 3.5, 9, -70, 11.3, -2 + i * 12, 'capBlack', null, 12);
+  box(p, 6, 1, 6, -70, 7.3, -12, 'chip');
+  finalize(p);
+}
+{
+  const p = makePart('sb', 'Elektronik', 'Southbridge', V(92, 8, -15), V(15, -25, 0), {
+    sub: 'Sony CXD90025G "Aeolia" mit eigenem Speicher',
+    text: 'Die Southbridge ist der Hausmeister der PS4. Sie kümmert sich um USB, Festplatte, Blu-ray, LAN und WLAN und hat einen eigenen kleinen ARM-Prozessor. So kann die PS4 im Ruhemodus Updates laden, während die große APU schläft.',
+    specs: [['Chip', 'Sony CXD90025G (Aeolia)'], ['Eigener RAM', '256 MB DDR3'], ['Firmware-Flash', '32 MB (Seriell-Flash)'], ['Steuert', 'USB, SATA, LAN, WLAN, Laufwerk']],
+    fact: 'Wenn man eine PS4 im Ruhemodus hat und nachts Spiele-Updates reinkommen, macht das zum großen Teil dieser Chip mit seinem eigenen Speicher.' });
+  box(p, 21, 2, 21, 88, 7.8, -30, 'chip');
+  box(p, 13, 0.3, 13, 88, 8.9, -30, 'metal2');
+  box(p, 10, 1.2, 13, 88, 7.4, 0, 'chip');
+  box(p, 6, 1, 8, 108, 7.3, -30, 'chip');
+  box(p, 5, 1.5, 3, 76, 7.5, -44, 'metal');
+  finalize(p);
+}
+{
+  const p = makePart('hdmi', 'Elektronik', 'HDMI-Chip', V(10, 7.5, -112), V(0, -25, -25), {
+    sub: 'Panasonic MN86471A, wandelt das Bildsignal um',
+    text: 'Die APU gibt ihr Bild als DisplayPort-Signal aus. Der Fernseher will aber HDMI. Dieser kleine Chip übersetzt das eine ins andere, direkt vor der HDMI-Buchse.',
+    specs: [['Chip', 'Panasonic MN86471A'], ['Aufgabe', 'DisplayPort → HDMI'], ['Standard', 'HDMI 1.4'], ['Auflösung', 'bis 1080p']],
+    fact: 'Eine abgebrochene HDMI-Buchse ist eine der häufigsten PS4-Reparaturen. Manchmal ist auch dieser Chip kaputt, dann bleibt der Bildschirm schwarz.' });
+  box(p, 12, 1.2, 12, 10, 7.4, -112, 'chip');
+  for (let i = 0; i < 6; i++) box(p, 1.8, 0.6, 1, 2 + i * 3, 7.2, -104, 'chipcap');
+  finalize(p);
+}
+{
+  const p = makePart('cmos', 'Elektronik', 'CMOS-Batterie', V(105, 9, 60), V(20, -25, 15), {
+    sub: 'Knopfzelle für die interne Uhr',
+    text: 'Die Knopfzelle hält die Uhr der PS4 am Laufen, auch wenn der Stecker gezogen ist. Die Uhrzeit ist wichtig für Trophäen, Downloads und die Lizenzen gekaufter Spiele.',
+    specs: [['Typ', 'CR2032 Lithium'], ['Spannung', '3 V'], ['Aufgabe', 'Uhr läuft ohne Strom weiter'], ['Lebensdauer', 'viele Jahre']],
+    fact: 'Wenn die Batterie leer war, mussten sich manche Spiele erst online die Uhrzeit holen. 2021 hat Sony das per Firmware-Update entschärft.' });
+  box(p, 24, 2, 22, 105, 7.6, 60, 'port');
+  cyl(p, 10, 3.2, 105, 10.2, 60, 'metal', null, 32);
+  box(p, 4, 0.3, 1, 105, 11.9, 55, 'metal2'); box(p, 1, 0.3, 4, 105, 11.9, 55, 'metal2');
+  finalize(p);
+}
+{
+  const p = makePart('wifi', 'Elektronik', 'WLAN/Bluetooth-Modul', V(-100, 36, -100), V(-60, 110, -60), {
+    sub: 'Funkmodul mit zwei Antennen',
+    text: 'Das kleine Modul macht WLAN fürs Internet und Bluetooth für die Controller. Unter dem Blechdeckel sitzt der Funkchip. Dünne Koaxialkabel führen zu zwei flachen Antennen im Gehäuse.',
+    specs: [['Chip', 'Marvell Avastar 88W8797'], ['WLAN', '802.11 b/g/n, nur 2,4 GHz'], ['Bluetooth', '2.1 + EDR'], ['Antennen', '2 Stück, im Gehäuse']],
+    fact: 'Die erste PS4 kann nur 2,4-GHz-WLAN. Erst PS4 Slim und PS4 Pro können auch 5 GHz. Für Online-Spiele ist ein LAN-Kabel deshalb viel besser.' });
+  box(p, 34, 1.2, 26, -95, 35, -115, 'pcb');
+  box(p, 18, 2.2, 15, -98, 36.7, -115, 'metal');
+  for (const dz of [-7, 7]) cyl(p, 1.2, 1.5, -82, 36.4, -115 + dz, 'gold', null, 8);
+  tube(p, [[-82, 37, -122], [-90, 38, -140], [-115, 38, -135], [-128, 36, -110]], 0.9, 'wire');
+  tube(p, [[-82, 37, -108], [-100, 38, -80], [-120, 37, -50], [-128, 36, -30]], 0.9, 'wire');
+  box(p, 0.4, 8, 30, -129, 36, -95, 'copper');
+  box(p, 0.4, 8, 30, -129, 36, -20, 'copper');
+  finalize(p);
+}
+
+// ---------- KÜHLUNG
+{
+  const p = makePart('cooler', 'Kühlung', 'Kühlkörper', V(-30, 18, -60), V(0, 90, 0), {
+    sub: 'Kupferblock, Heatpipes und Alu-Lamellen',
+    text: 'Der Kupferblock liegt mit Wärmeleitpaste direkt auf der APU. Die Heatpipes sind Kupferrohre, in denen eine Flüssigkeit verdampft: Sie ziehen die Wärme blitzschnell nach hinten zu den dünnen Aluminium-Lamellen. Dort bläst der Lüfter sie raus. Ein X-förmiger Bügel drückt alles fest auf den Chip.',
+    specs: [['Basis', 'Kupferblock auf dem APU-Die'], ['Transport', '4 Heatpipes aus Kupfer'], ['Lamellen', '41 Aluminium-Lamellen'], ['Anpressung', 'X-Bügel mit 4 Schrauben']],
+    fact: 'Wenn eine alte PS4 laut wie ein Föhn wird, ist meist die Wärmeleitpaste ausgetrocknet oder Staub hängt in den Lamellen. Paste erneuern hilft oft enorm.' });
+  box(p, 40, 4, 40, 20, 11.3, 15, 'copper');
+  box(p, 84, 1.5, 8, 20, 14, 15, 'metal', [0, Math.PI / 4, 0]);
+  box(p, 84, 1.5, 8, 20, 14, 15, 'metal', [0, -Math.PI / 4, 0]);
+  for (const [dx, dz] of [[28, 28], [-28, 28], [28, -28], [-28, -28]]) cyl(p, 3, 4, 20 + dx, 14.5, 15 + dz, 'metal', null, 12);
+  [-9, -3, 3, 9].forEach((o, i) => {
+    const y = 15 + (i % 2) * 7;
+    tube(p, [[36, 12.5, 15 + o], [4, 12.5, 15 + o], [-10, 22, -5 + o], [-14, 26.5, -60 + o * 0.5], [-17, y, -118 + o * 0.9], [-100, y, -120 + o * 0.9]], 2.5, 'copper', 72);
+  });
+  for (let x = -100; x <= -20; x += 2) box(p, 0.8, 17, 35, x, 19, -122, 'alu');
+  box(p, 82, 0.8, 35, -60, 27.8, -122, 'alu');
+  box(p, 82, 0.8, 35, -60, 10.2, -122, 'alu');
+  finalize(p);
+}
+{
+  const p = makePart('fan', 'Kühlung', 'Lüfter', V(-60, 17, -60), V(-70, 55, -10), {
     sub: 'Radiallüfter (Blower), ca. 85 mm',
-    text: 'Der Lüfter saugt die Luft von oben und unten an und drückt sie seitlich durch die Lamellen des Kühlkörpers nach hinten raus. Je heißer die APU, desto schneller dreht er.',
-    facts: ['Bauart: Radiallüfter (wie ein Hamsterrad)', 'Hauptquelle für den berühmten "Düsenjet"-Sound', 'Reinigen: Gehäuse öffnen, Staub vorsichtig raus'] });
-  add(p, new THREE.CylinderGeometry(42, 42, 16, 40, 1, true), -80, 17, -85, 'black');
-  cyl(p, 42, 1.5, -80, 9.75, -85, 'black', null, 40);
-  add(p, new THREE.RingGeometry(18, 42, 40), -80, 25, -85, 'black', [-Math.PI / 2, 0, 0]);
-  box(p, 30, 16, 36, -52, 17, -108, 'black');
-  const rotor = new THREE.Group();
-  rotor.position.set(0, 0, 0);
-  p.group.add(rotor);
-  const blades = [cyl(p, 14, 12, -80, 17, -85, 'black', null, 20)];
-  for (let i = 0; i < 24; i++) {
-    const a = i / 24 * Math.PI * 2;
-    blades.push(box(p, 14, 12, 1.2, -80 + Math.cos(a) * 26, 17, -85 + Math.sin(a) * 26, 'black', [0, -a + 0.5, 0]));
+    text: 'Der Radiallüfter saugt die Luft von oben ins Laufrad und schleudert sie nach außen. Das Gehäuse lenkt sie durch den Kanal nach hinten durch die Lamellen des Kühlkörpers. Die Drehzahl regelt die PS4 je nach Temperatur.',
+    specs: [['Bauart', 'Radiallüfter (wie ein Hamsterrad)'], ['Durchmesser', 'ca. 85 mm'], ['Schaufeln', '31, gebogen'], ['Spannung', '12 V, drehzahlgeregelt']],
+    fact: 'Der Lüfter ist die Hauptquelle für den berühmten "Düsenjet"-Sound mancher PS4. Grund ist fast immer Staub, der Luftwiderstand steigt und er muss schneller drehen.' });
+  prim(p, new THREE.CylinderGeometry(40, 40, 14, 40, 1, true), -60, 17, -60, 'black');
+  cyl(p, 40, 1.2, -60, 10.6, -60, 'black', null, 40);
+  ring(p, 17, 40, -60, 24, -60, 'black');
+  box(p, 80, 1.2, 8, -60, 23.4, -101, 'black');
+  box(p, 80, 1.2, 8, -60, 10.6, -101, 'black');
+  box(p, 1.2, 14, 8, -100, 17, -101, 'black');
+  box(p, 1.2, 14, 8, -20, 17, -101, 'black');
+  for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; cyl(p, 4, 2, -60 + Math.cos(a) * 46, 11, -60 + Math.sin(a) * 46, 'black', null, 10); }
+  tube(p, [[-33, 12, -50], [-30, 11, -65], [-30, 9.5, -78]], 0.8, 'wireY', 16);
+  startSub(p, -60, 17, -60, 14);
+  cyl(p, 13, 10, -60, 17, -60, 'black', null, 24);
+  cyl(p, 9, 0.3, -60, 22.2, -60, 'label', null, 24);
+  for (let i = 0; i < 31; i++) {
+    const a = i / 31 * Math.PI * 2;
+    box(p, 12, 11, 0.8, -60 + Math.cos(a) * 25, 17, -60 + Math.sin(a) * 25, 'black', [0, -a + 0.9, 0]);
   }
-  for (const b of blades) rotor.add(b);
-  p.rotor = rotor;
+  p.sub = null;
+  finalize(p);
 }
-// --- Abschirmblech
 {
-  const p = makePart('shield', 'Abschirmblech', V(0, 30, -5), V(0, 150, 0), {
-    sub: 'Metallplatte über dem Mainboard',
-    text: 'Das Blech schirmt die Elektronik gegen Funkstörungen ab (EMV) und macht die Konsole stabiler. Netzteil und Laufwerk liegen oben drauf.',
-    facts: ['Aus dünnem Stahlblech', 'Ohne Abschirmung würde die PS4 z. B. WLAN stören', 'Mit vielen Schrauben am Rahmen befestigt'] });
-  box(p, 250, 1, 275, 0, 30, -5, 'metal');
-  for (let i = 0; i < 6; i++) box(p, 220, 1.5, 4, 0, 30.9, -115 + i * 44, 'metal');
+  const p = makePart('shield', 'Kühlung', 'Abschirmblech', V(0, 30, -5), V(0, 140, 0), {
+    sub: 'Metallplatte zwischen Mainboard und Netzteil',
+    text: 'Das Blech trennt die empfindliche Elektronik vom Netzteil und schirmt Funkstörungen ab (EMV). Über dem Lüfter hat es Lochgitter, damit Luft durchkommt. Nebenbei macht es die ganze Konsole steifer.',
+    specs: [['Material', 'dünnes Stahlblech'], ['Aufgabe', 'Abschirmung (EMV) und Stabilität'], ['Lochgitter', 'über dem Lüfter zum Ansaugen'], ['Befestigung', 'mehrere Schrauben am Rahmen']],
+    fact: 'Ohne Abschirmung könnte die schnelle Elektronik WLAN, Bluetooth und sogar Radios in der Nähe stören. Das ist gesetzlich geregelt.' });
+  box(p, 250, 0.8, 275, 0, 30, -5, 'metal');
+  for (let i = 0; i < 6; i++) box(p, 220, 1.5, 4, 10, 30.9, -120 + i * 44, 'metal');
+  for (let ix = 0; ix < 9; ix++) for (let iz = 0; iz < 9; iz++) {
+    const x = -60 + (ix - 4) * 7, z = -60 + (iz - 4) * 7;
+    if (Math.hypot(x + 60, z + 60) < 30) box(p, 4, 0.3, 4, x, 30.5, z, 'port');
+  }
   box(p, 250, 7, 1, 0, 26.5, -142.5, 'metal');
   box(p, 250, 7, 1, 0, 26.5, 132.5, 'metal');
+  for (const [x, z] of BOARD_HOLES) cyl(p, 3, 1.2, x, 30.8, z, 'metal2', null, 10);
+  finalize(p);
 }
-// --- Netzteil
+
+// ---------- STROM
 {
-  const p = makePart('psu', 'Netzteil', V(40, 41, -72), V(0, 205, -40), {
-    sub: 'Internes Netzteil, kein Ziegel am Kabel',
-    text: 'Anders als bei der Xbox One steckt das Netzteil in der Konsole. Es macht aus 230 V Wechselstrom die 12 V Gleichstrom, die das Mainboard braucht.',
-    facts: ['Nennleistung ca. 250 W', 'Im Spiel zieht die PS4 etwa 140 – 150 W', 'Hinten: Buchse für das Kaltgerätekabel (Achter-Stecker)'] });
-  box(p, 175, 18, 115, 40, 41, -72, 'psu');
-  for (let i = 0; i < 6; i++) box(p, 150, 0.6, 3, 40, 50.3, -120 + i * 12, 'port');
-  box(p, 60, 0.4, 36, 20, 50.2, -38, 'label');
-  box(p, 22, 12, 10, 110, 41, -133, 'port');
+  const p = makePart('psuCase', 'Strom', 'Netzteil-Gehäuse', V(40, 41, -72), V(0, 215, -30), {
+    sub: 'Internes Netzteil, kein "Ziegelstein" am Kabel',
+    text: 'Anders als bei der Xbox One steckt das Netzteil in der PS4. Das Metallgehäuse schirmt ab, hat Lüftungsschlitze und hinten die Buchse für das Stromkabel. Innen sitzt die eigentliche Netzteil-Platine.',
+    specs: [['Eingang', '100 – 240 V ~, 50/60 Hz'], ['Ausgang', '12 V Gleichstrom'], ['Nennleistung', 'ca. 250 W'], ['Stecker', 'Kaltgeräte "Achter" (C7)']],
+    fact: 'Im Spiel zieht die erste PS4 etwa 140–150 W aus der Steckdose, im Ruhemodus nur ein paar Watt.' });
+  box(p, 175, 0.8, 115, 40, 49.6, -72, 'psu');
+  box(p, 175, 0.8, 115, 40, 32.4, -72, 'psu');
+  box(p, 0.8, 18, 115, -47.1, 41, -72, 'psu');
+  box(p, 0.8, 18, 115, 127.1, 41, -72, 'psu');
+  box(p, 175, 18, 0.8, 40, 41, -14.6, 'psu');
+  box(p, 175, 18, 0.8, 40, 41, -129.4, 'psu');
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) box(p, 60, 0.3, 3, 60 + j * 65 - 40, 50.1, -120 + i * 7, 'port');
+  box(p, 60, 0.3, 36, 10, 50.1, -40, 'label');
+  box(p, 20, 11, 10, 105, 41, -134.5, 'port');
+  for (const dx of [-4, 4]) cyl(p, 1, 6, 105 + dx, 41, -137, 'metal', [Math.PI / 2, 0, 0], 8);
+  for (const [x, z] of [[-40, -20], [120, -20], [-40, -124], [120, -124]]) cyl(p, 2.5, 1, x, 50.4, z, 'metal2', null, 10);
+  finalize(p);
 }
-// --- Blu-ray
 {
-  const p = makePart('bd', 'Blu-ray-Laufwerk', V(55, 41, 72), V(30, 205, 70), {
-    sub: 'Slot-in-Laufwerk für BD, DVD und CD',
-    text: 'Discs werden direkt eingezogen, es gibt keine Schublade. Ein blau-violetter Laser liest die winzigen Spuren einer Blu-ray. Spiele werden aber trotzdem auf die Festplatte installiert.',
-    facts: ['Blu-ray mit 6-facher Geschwindigkeit, DVD 8-fach', 'Laser: 405 nm (blau-violett)', 'Eine Blu-ray fasst 25 bzw. 50 GB'] });
-  box(p, 128, 17, 126, 55, 41, 72, 'alu');
+  const p = makePart('psuBoard', 'Strom', 'Netzteil-Platine', V(40, 39, -72), V(0, 175, -30), {
+    sub: 'Hier wird aus 230 V ~ sauberer 12-V-Gleichstrom',
+    text: 'Der Strom kommt über einen Filter rein, wird gleichgerichtet und von der PFC-Drossel (der Kupferring) geglättet. Der große Kondensator speichert Energie. Der Trafo (gelb) trennt die gefährliche Netzspannung sicher von der Elektronik, und Kühlkörper führen die Abwärme der Schalttransistoren ab.',
+    specs: [['Bauteile', 'Trafo, PFC-Drossel, Elkos, Kühlkörper'], ['PFC', 'sorgt für "sauberen" Strombezug'], ['Trennung', 'Trafo trennt Netz- und Niederspannung'], ['Ausgang', '12 V zum Mainboard']],
+    fact: 'Der große Kondensator kann auch nach dem Ausstecken noch gefährliche Spannung halten. Ein Netzteil also nie selbst aufmachen!' });
+  box(p, 168, 1.6, 108, 40, 34, -72, 'pcbBrown');
+  cyl(p, 9, 13, 95, 41.3, -45, 'capBlack', null, 24);
+  cyl(p, 7, 11, 95, 40.3, -65, 'capBlack', null, 24);
+  box(p, 24, 12, 22, 40, 41.8, -72, 'transformer');
+  box(p, 28, 10, 7, 40, 41.8, -72, 'ferrite');
+  torus(p, 9, 3.8, 0, 39.5, -105, 'copper', [Math.PI / 2, 0, 0]);
+  for (const x of [-14, -10, -6]) box(p, 1.5, 12, 40, x, 41.8, -60, 'alu');
+  for (const x of [66, 70]) box(p, 1.5, 12, 36, x, 41.8, -100, 'alu');
+  for (let i = 0; i < 6; i++) cyl(p, 4, 9, -35, 39.3, -110 + i * 11, 'cap', null, 12);
+  torus(p, 5, 2.2, 110, 38, -110, 'copper', [Math.PI / 2, 0, 0]);
+  box(p, 4, 3, 12, 115, 36.5, -95, 'glass');
+  tube(p, [[100, 33, -30], [100, 22, -35], [100, 13, -40]], 1.6, 'wireY', 12);
+  tube(p, [[106, 33, -30], [106, 22, -35], [106, 13, -40]], 1.6, 'wire', 12);
+  finalize(p);
+}
+
+// ---------- LAUFWERKE
+{
+  const p = makePart('bdMech', 'Laufwerke', 'Blu-ray-Laufwerk', V(55, 38, 72), V(40, 175, 70), {
+    sub: 'Slot-in-Laufwerk: Motor, Laser-Schlitten und Elektronik',
+    text: 'Die Disc wird eingezogen und vom Spindelmotor gedreht. Der Laser-Schlitten fährt auf zwei Stangen von innen nach außen und liest die Spur. Ein blau-violetter Laser (405 nm) ist nötig, weil die Spuren auf einer Blu-ray so fein sind. Eine eigene Platine steuert alles.',
+    specs: [['Blu-ray', '6-fach (ca. 27 MB/s)'], ['DVD', '8-fach'], ['Laser', '405 nm (BD), 650 nm (DVD)'], ['Einzug', 'Slot-in, keine Schublade']],
+    fact: 'Die PS4 kann Blu-rays und DVDs abspielen, aber keine Audio-CDs. Das konnte die PS3 noch.' });
+  box(p, 128, 1, 126, 55, 32.5, 72, 'metal');
+  box(p, 1, 12, 126, -9, 38.5, 72, 'metal');
+  box(p, 1, 12, 126, 119, 38.5, 72, 'metal');
+  box(p, 128, 12, 1, 55, 38.5, 9.5, 'metal');
+  cyl(p, 9, 4, 55, 35, 72, 'metal', null, 24);
+  cyl(p, 7, 1.5, 55, 37.7, 72, 'black', null, 24);
+  box(p, 26, 5, 22, 55, 35.5, 40, 'black');
+  cyl(p, 2.2, 1, 55, 38.5, 42, 'lens', null, 16);
+  for (const dx of [-16, 16]) cyl(p, 1.5, 70, 55 + dx, 35, 40, 'metal', [Math.PI / 2, 0, 0], 8);
+  cyl(p, 3, 14, 80, 35, 30, 'metal', [Math.PI / 2, 0, 0], 12);
+  cyl(p, 1, 40, 80, 35, 50, 'metal2', [Math.PI / 2, 0, 0], 6);
+  box(p, 90, 1.2, 35, 55, 34, 22, 'pcb');
+  box(p, 12, 1, 12, 40, 35, 22, 'chip');
+  box(p, 110, 2, 4, 55, 39, 128, 'black');
   box(p, 128, 17, 3, 55, 41, 136.5, 'black');
   box(p, 110, 2.5, 1, 55, 41, 138.3, 'port');
-  cyl(p, 60, 1.2, 55, 41, 72, 'disc', null, 48);
-  cyl(p, 7.5, 2.5, 55, 41, 72, 'metal', null, 20);
+  box(p, 20, 24, 0.4, 70, 21, 9, 'flex');
+  finalize(p);
 }
-// --- Festplatte
 {
-  const p = makePart('hdd', 'Festplatte', V(-100, 17, 62), V(-160, 10, 70), {
-    sub: '2,5 Zoll, 500 GB, im Metallrahmen',
-    text: 'Die Festplatte steckt unter dem Hochglanz-Deckel und lässt sich tauschen: Deckel abschieben, eine Schraube raus, Rahmen rausziehen. Viele haben später eine SSD eingebaut.',
-    facts: ['500 GB, 5400 Umdrehungen pro Minute', 'Tauschen erlaubt, max. 9,5 mm Bauhöhe', 'Anschluss: SATA'] });
-  box(p, 76, 2, 106, -100, 11.5, 62, 'metal');
-  box(p, 2, 10, 106, -138, 16.5, 62, 'metal');
-  box(p, 2, 10, 106, -62, 16.5, 62, 'metal');
-  box(p, 70, 9.5, 100, -100, 17.3, 62, 'alu');
-  box(p, 50, 0.3, 58, -100, 22.2, 58, 'label');
-  cyl(p, 26, 0.3, -100, 22.1, 70, 'disc', null, 40);
-  box(p, 30, 6, 3, -100, 17, 10.5, 'port');
+  const p = makePart('bdCover', 'Laufwerke', 'Laufwerksdeckel', V(55, 49.5, 72), V(40, 230, 70), {
+    sub: 'Blechdeckel mit Disc-Klemme',
+    text: 'Der Deckel schützt die Mechanik vor Staub und schirmt ab. In seiner Mitte sitzt der Klemmring (Clamper). Er drückt die Disc magnetisch auf den Motor, damit sie beim schnellen Drehen nicht rutscht.',
+    specs: [['Material', 'Stahlblech'], ['Clamper', 'magnetischer Klemmring'], ['Schrauben', '4']],
+    fact: 'Bei 6-facher Blu-ray-Geschwindigkeit dreht sich die Disc innen mit rund 5000 Umdrehungen pro Minute.' });
+  box(p, 128, 1, 126, 55, 49.5, 72, 'metal');
+  cyl(p, 14, 1.5, 55, 48.3, 72, 'metal2', null, 32);
+  ring(p, 20, 24, 55, 50.1, 72, 'metal2');
+  box(p, 128, 4, 1, 55, 47.5, 9.5, 'metal');
+  for (const [dx, dz] of [[-60, -58], [60, -58], [-60, 58], [60, 58]]) cyl(p, 2.5, 1, 55 + dx, 50.2, 72 + dz, 'metal2', null, 10);
+  finalize(p);
 }
-// --- WLAN
 {
-  const p = makePart('wifi', 'WLAN/Bluetooth-Modul', V(-95, 36, -115), V(-70, 110, -70), {
-    sub: 'Funkmodul mit Antennenkabeln',
-    text: 'Das kleine Modul macht WLAN für das Internet und Bluetooth für die Controller. Die dünnen Kabel führen zu Antennen im Gehäuse.',
-    facts: ['WLAN 802.11 b/g/n, nur 2,4 GHz', 'Bluetooth 2.1 für DualShock 4 und Headsets', 'Für Online-Spiele ist LAN-Kabel besser'] });
-  box(p, 34, 1.5, 26, -95, 35, -115, 'pcb');
-  box(p, 16, 2.5, 14, -98, 37, -115, 'metal');
-  cyl(p, 1.1, 80, -130, 36.5, -110, 'port', [0, 0, Math.PI / 2], 8);
-  cyl(p, 1.1, 80, -130, 36.5, -120, 'port', [0, 0, Math.PI / 2], 8);
+  const p = makePart('disc', 'Laufwerke', 'Blu-ray-Disc', V(55, 40.5, 72), V(40, 205, 70), {
+    sub: 'Das Spiel auf der Scheibe',
+    text: 'Eine Blu-ray ist 12 cm groß wie eine CD, fasst aber viel mehr, weil die Spuren viel enger liegen. Die Daten stecken in einer Schicht nur 0,1 mm unter der Oberfläche. Oben ist das Etikett, unten die spiegelnde Datenseite.',
+    specs: [['Kapazität', '25 GB (1 Schicht) / 50 GB (2 Schichten)'], ['Durchmesser', '12 cm'], ['Spurabstand', '0,32 µm'], ['Datenschicht', '0,1 mm unter der Oberfläche']],
+    fact: 'Auf der PS4 wird jedes Disc-Spiel erst auf die Festplatte installiert. Danach dient die Disc vor allem als "Schlüssel", der beweist, dass dir das Spiel gehört.' });
+  startSub(p, 55, 40.5, 72, 6);
+  ring(p, 7.5, 17, 55, 41.1, 72, 'discClear', 32);
+  ring(p, 17, 60, 55, 41.1, 72, 'discLabel', 64);
+  ring(p, 7.5, 60, 55, 39.9, 72, 'discData', 64);
+  prim(p, new THREE.CylinderGeometry(60, 60, 1.2, 64, 1, true), 55, 40.5, 72, 'disc');
+  p.sub = null;
+  finalize(p);
 }
-// --- Front-USB
 {
-  const p = makePart('usb', 'Front-USB-Platine', V(-30, 26, 144), V(0, 0, 110), {
-    sub: '2 × USB 3.0 vorne',
-    text: 'Die kleine Platine vorne hält die beiden USB-Anschlüsse in der Fuge zwischen den Gehäusehälften. Da lädt man den Controller oder steckt einen Stick für Updates rein.',
-    facts: ['2 × USB 3.0', 'Laden des DualShock 4 auch im Ruhemodus', 'Power- und Auswurf-Taste sind Touch-Sensoren'] });
-  box(p, 70, 1.5, 16, -30, 24, 142, 'pcb');
-  box(p, 14, 6, 14, -45, 27.5, 145, 'metal');
-  box(p, 14, 6, 14, -15, 27.5, 145, 'metal');
+  const p = makePart('caddy', 'Laufwerke', 'Festplatten-Rahmen', V(-100, 15, 62), V(-120, 0, 50), {
+    sub: 'Metallschlitten für die Festplatte',
+    text: 'Die Festplatte ist mit vier Schrauben in diesem Metallrahmen befestigt. Der Rahmen gleitet in den Schacht unter der Hochglanz-Abdeckung und wird mit einer einzigen Schraube gesichert.',
+    specs: [['Material', 'Metall'], ['Festplatte', 'mit 4 Schrauben befestigt'], ['Schacht', '1 Schraube hält den Rahmen'], ['Werkzeug', 'Kreuzschlitz-Schraubendreher']],
+    fact: 'Die Schraube, die den Rahmen hält, trägt die PlayStation-Symbole △ ○ × □. Daran erkennt man sie sofort.' });
+  box(p, 76, 1, 106, -100, 11, 62, 'metal');
+  box(p, 1.5, 10, 106, -138.5, 16, 62, 'metal');
+  box(p, 1.5, 10, 106, -61.5, 16, 62, 'metal');
+  box(p, 76, 10, 3, -100, 16, 116.5, 'black');
+  cyl(p, 3, 2, -100, 22, 118, 'metal', null, 12);
+  for (const x of [-139.5, -60.5]) for (const dz of [-35, 35]) cyl(p, 2.5, 3, x, 17, 62 + dz, 'metal', [0, 0, Math.PI / 2], 10);
+  finalize(p);
+}
+{
+  const p = makePart('hdd', 'Laufwerke', 'Festplatte', V(-100, 17, 62), V(-170, 20, 80), {
+    sub: '2,5-Zoll-Festplatte, 500 GB',
+    text: 'Unter dem Deckel dreht sich eine magnetisch beschichtete Scheibe (Platter). Der Schreib-/Lesekopf sitzt an einem Arm, den ein Magnet blitzschnell hin und her schwenkt. Hinten ist der SATA-Anschluss für Daten und Strom.',
+    specs: [['Kapazität', '500 GB'], ['Format', '2,5 Zoll, max. 9,5 mm hoch'], ['Drehzahl', '5400 U/min'], ['Anschluss', 'SATA II (3 Gbit/s)']],
+    fact: 'Der Kopf schwebt nur wenige Nanometer über der Scheibe, auf einem Luftpolster. Ein Staubkorn wäre dagegen ein Felsbrocken.' });
+  box(p, 70, 1, 100, -100, 12.5, 62, 'alu');
+  box(p, 1, 9, 100, -134.5, 17, 62, 'alu');
+  box(p, 1, 9, 100, -65.5, 17, 62, 'alu');
+  box(p, 70, 9, 1, -100, 17, 12.5, 'alu');
+  box(p, 70, 9, 1, -100, 17, 111.5, 'alu');
+  box(p, 70, 0.8, 100, -100, 21.8, 62, 'alu');
+  box(p, 50, 0.3, 58, -100, 22.3, 50, 'label');
+  cyl(p, 5, 8, -76, 17, 104, 'metal', null, 16);
+  box(p, 24.6, 0.8, 4, -80.5, 17.5, 97, 'metal', [0, 2.034, 0]);
+  box(p, 3, 1.2, 2, -86, 17.5, 86, 'gold');
+  box(p, 16, 4, 14, -72, 14.8, 112, 'magnet');
+  box(p, 28, 6, 4, -100, 15, 11, 'port');
+  box(p, 24, 0.3, 2, -100, 13.5, 10.5, 'gold');
+  startSub(p, -100, 17, 72, 20);
+  ring(p, 8, 32.5, -100, 16.6, 72, 'disc', 48);
+  cyl(p, 8, 5, -100, 17, 72, 'metal', null, 20);
+  p.sub = null;
+  finalize(p);
 }
 
-for (const p of parts) {
-  const b = new THREE.Box3().setFromObject(p.group);
-  const s = b.getSize(new THREE.Vector3());
-  p.volume = s.x * s.y * s.z;
-}
-
-// ---------------------------------------------------------------- Sockel (Projektor)
+// ================================================================ Sockel (Projektor)
 const baseGroup = new THREE.Group();
 modelRoot.add(baseGroup);
 const addMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 const baseDisk = new THREE.Mesh(new THREE.CircleGeometry(0.24, 64).rotateX(-Math.PI / 2), addMat(0x3fd6ff, 0.07));
 const baseRing = new THREE.Mesh(new THREE.RingGeometry(0.232, 0.246, 96).rotateX(-Math.PI / 2), addMat(0x6fe6ff, 0.8));
 const baseSpin = new THREE.Group();
-for (let i = 0; i < 3; i++) {
-  const arc = new THREE.Mesh(new THREE.RingGeometry(0.205, 0.214, 48, 1, i * 2.094, 1.5).rotateX(-Math.PI / 2), addMat(0x6fe6ff, 0.55));
-  baseSpin.add(arc);
-}
+for (let i = 0; i < 3; i++) baseSpin.add(new THREE.Mesh(new THREE.RingGeometry(0.205, 0.214, 48, 1, i * 2.094, 1.5).rotateX(-Math.PI / 2), addMat(0x6fe6ff, 0.55)));
+const tickGeo = [];
+for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, r0 = i % 6 ? 0.222 : 0.215; tickGeo.push(V(Math.cos(a) * r0, 0, Math.sin(a) * r0), V(Math.cos(a) * 0.229, 0, Math.sin(a) * 0.229)); }
+const baseTicks = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tickGeo), new THREE.LineBasicMaterial({ color: 0x6fe6ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
 const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.1, 64, 1, true).translate(0, 0.05, 0), new THREE.ShaderMaterial({
   uniforms: { uColor: { value: HOLO } },
   vertexShader: 'varying float vY; void main(){ vY = position.y / 0.1; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ gl_FragColor = vec4(uColor, (1.0 - vY) * 0.18); }',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-baseGroup.add(baseDisk, baseRing, baseSpin, cone);
+baseGroup.add(baseDisk, baseRing, baseSpin, baseTicks, cone);
 
-// ---------------------------------------------------------------- Panels (Canvas-Texturen)
+// ================================================================ Fluss-Animationen (Luft, Strom, Daten)
+const dotTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const FLOWS = {
+  luft: {
+    title: 'LUFTSTROM & WÄRME',
+    text: 'Kühle Luft (blau) wird vorne und an den Seiten durch die Fuge angesaugt. Der Radiallüfter zieht sie von oben ins Laufrad und drückt sie durch den Kanal nach hinten durch die Alu-Lamellen. Gleichzeitig transportieren die Heatpipes die Wärme der APU (orange) zu genau diesen Lamellen. Hinten kommt die aufgeheizte Luft raus (rot).',
+    tip: 'Deshalb die PS4 nie in einen engen Schrank stellen und die Rückseite frei lassen!',
+    grad: [[0, 0x58c8ff], [0.4, 0x9fe6ff], [0.7, 0xffb040], [1, 0xff4a20]],
+    legend: [[0x58c8ff, 'kühle Luft'], [0xffa030, 'Wärme aus der APU'], [0xff4a20, 'heiße Abluft']],
+    speed: 95,
+    paths: [
+      { n: 40, j: 8, pts: [[-165, 27, 50, 0], [-130, 27, 35, 0], [-95, 27, -10, 0], [-62, 27, -52, 0], [-60, 19, -60, 0.15], [-68, 17, -92, 0.35], [-60, 19, -110, 0.55], [-60, 19, -140, 0.95], [-60, 19, -210, 1]] },
+      { n: 40, j: 8, pts: [[165, 27, 60, 0], [120, 27, 40, 0], [40, 27, -5, 0], [-40, 27, -48, 0], [-58, 19, -60, 0.15], [-80, 17, -92, 0.35], [-82, 19, -112, 0.55], [-82, 19, -140, 0.95], [-82, 19, -210, 1]] },
+      { n: 40, j: 8, pts: [[20, 27, 190, 0], [5, 27, 150, 0], [-25, 27, 40, 0], [-52, 27, -40, 0], [-60, 19, -60, 0.15], [-45, 17, -92, 0.35], [-38, 19, -112, 0.55], [-38, 19, -140, 0.95], [-38, 19, -210, 1]] },
+      { n: 22, j: 1, speed: 40, pts: [[25, 12.5, 15, 0.72], [4, 12.5, 12, 0.72], [-10, 22, -8, 0.72], [-14, 26.5, -62, 0.72], [-17, 16, -120, 0.72], [-100, 16, -121, 0.72]] },
+      { n: 22, j: 1, speed: 40, pts: [[25, 12.5, 21, 0.72], [4, 12.5, 18, 0.72], [-10, 22, -2, 0.72], [-14, 26.5, -58, 0.72], [-17, 22, -114, 0.72], [-100, 22, -115, 0.72]] },
+    ],
+    labels: [['Luft rein', [-150, 32, 45]], ['Luft rein', [150, 32, 55]], ['heiße Luft raus', [-60, 28, -200]], ['Heatpipes', [-12, 32, -40]]],
+  },
+  strom: {
+    title: 'STROMVERSORGUNG',
+    text: 'Aus der Steckdose kommen 230 V Wechselstrom (rot). Das Netzteil macht daraus 12 V Gleichstrom (gelb) und schickt ihn über dicke Kabel zum Mainboard. Von dort gehen 12 V an Lüfter, Laufwerk und Festplatte. Die Spannungswandler machen daraus rund 1 V für die APU (grün), dafür fließt dann ein riesiger Strom.',
+    tip: 'Je kleiner die Spannung, desto größer der Strom bei gleicher Leistung: 100 W bei 1 V sind 100 Ampere!',
+    grad: [[0, 0xff3030], [0.3, 0xff8a20], [0.5, 0xffe040], [0.8, 0xc8ff40], [1, 0x40ff90]],
+    legend: [[0xff3030, '230 V Wechselstrom'], [0xffe040, '12 V Gleichstrom'], [0x40ff90, 'ca. 1 V für die APU']],
+    speed: 140,
+    paths: [
+      { n: 26, j: 1, pts: [[105, 41, -210, 0], [105, 41, -134, 0], [110, 38, -110, 0.1], [0, 39.5, -105, 0.25], [40, 41.8, -72, 0.4], [95, 41, -45, 0.5], [100, 33, -30, 0.5], [100, 13, -40, 0.5]] },
+      { n: 22, j: 1, pts: [[100, 11, -40, 0.5], [40, 9, -20, 0.5], [-40, 9, 5, 0.6], [-48, 12, 28, 0.85], [-30, 9, 20, 1], [20, 9, 15, 1]] },
+      { n: 12, j: 1, pts: [[100, 11, -40, 0.5], [95, 9, -35, 0.5], [88, 9, -30, 0.5]] },
+      { n: 14, j: 1, pts: [[100, 11, -40, 0.5], [20, 9, -70, 0.5], [-30, 9.5, -80, 0.5], [-33, 12, -50, 0.5], [-60, 17, -60, 0.5]] },
+      { n: 16, j: 1, pts: [[100, 11, -40, 0.5], [70, 9, 20, 0.5], [70, 21, 9, 0.5], [55, 34, 22, 0.5]] },
+      { n: 16, j: 1, pts: [[100, 11, -40, 0.5], [0, 9, 20, 0.5], [-62, 9.3, 40, 0.5], [-100, 15, 11, 0.5]] },
+    ],
+    labels: [['230 V ~', [105, 55, -190]], ['12 V', [100, 25, -40]], ['≈ 1 V', [-48, 22, 28]]],
+  },
+  daten: {
+    title: 'DATENFLUSS',
+    text: 'Spieldaten kommen von der Festplatte oder der Blu-ray (grün) und laufen über die Southbridge zur APU. Die APU schaufelt ständig Daten mit 176 GB/s zwischen sich und den GDDR5-Chips hin und her (cyan). Das fertige Bild geht als DisplayPort-Signal zum HDMI-Chip, der es in HDMI umwandelt (magenta), und dann zum Fernseher.',
+    tip: 'Internet (LAN/WLAN) und USB laufen ebenfalls über die Southbridge.',
+    grad: [[0, 0x40ff90], [0.45, 0x40e0ff], [0.55, 0x40e0ff], [1, 0xff40e0]],
+    legend: [[0x40ff90, 'Spieldaten (HDD/Blu-ray/Netz)'], [0x40e0ff, 'APU ↔ GDDR5'], [0xff40e0, 'Bildsignal → TV']],
+    speed: 170,
+    paths: [
+      { n: 20, j: 1, pts: [[-100, 17, 80, 0], [-100, 15, 11, 0], [-62, 9, 30, 0.1], [0, 9, 60, 0.2], [70, 9, 30, 0.25], [88, 9, -30, 0.35], [45, 9, -5, 0.4], [20, 9, 15, 0.45]] },
+      { n: 16, j: 1, pts: [[55, 38, 72, 0], [55, 34, 22, 0.05], [70, 21, 9, 0.1], [70, 9, 20, 0.2], [88, 9, -30, 0.35], [45, 9, -5, 0.4], [20, 9, 15, 0.45]] },
+      { n: 14, j: 1, pts: [[35, 13, -170, 0], [35, 13, -134, 0.05], [70, 9, -60, 0.2], [88, 9, -30, 0.35]] },
+      { n: 14, j: 1, pts: [[-98, 37, -115, 0], [-95, 9, -105, 0.1], [0, 9, -60, 0.2], [88, 9, -30, 0.35]] },
+      ...RAM_POS.map(([dx, dz]) => ({ n: 6, j: 1, speed: 120, pts: [[20, 9.5, 15, 0.5], [20 + dx, 8.5, 15 + dz, 0.5], [20 + dx * 1.05, 9.5, 15 + dz * 1.05, 0.5], [20, 9, 15, 0.5]] })),
+      { n: 18, j: 1, pts: [[20, 9, 15, 0.6], [15, 9, -50, 0.7], [10, 8.5, -112, 0.85], [10, 9.8, -137, 0.95], [10, 10, -210, 1]] },
+    ],
+    labels: [['Spieldaten', [-100, 30, 90]], ['176 GB/s', [20, 24, 15]], ['HDMI → TV', [10, 22, -195]]],
+  },
+};
+const flowOrder = [null, 'luft', 'strom', 'daten'];
+const gradColor = (grad, s, out) => {
+  let i = 0;
+  while (i < grad.length - 2 && s > grad[i + 1][0]) i++;
+  const [s0, c0] = grad[i], [s1, c1] = grad[i + 1];
+  const t = THREE.MathUtils.clamp((s - s0) / Math.max(1e-6, s1 - s0), 0, 1);
+  return out.set(c0).lerp(_c.set(c1), t);
+};
+const _c = new THREE.Color();
+for (const [key, f] of Object.entries(FLOWS)) {
+  const parts_ = [];
+  const r = rng(key.length * 17);
+  for (const path of f.paths) {
+    const pts = path.pts.map(a => ({ v: V(a[0], a[1], a[2]), s: a[3] }));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].v.distanceTo(pts[i - 1].v));
+    const L = cum[cum.length - 1];
+    for (let k = 0; k < path.n; k++) parts_.push({ pts, cum, L, phase: (k / path.n) * L + r() * 4, speed: path.speed || f.speed, jit: V((r() - 0.5) * path.j * 2, (r() - 0.5) * path.j, (r() - 0.5) * path.j * 2) });
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(parts_.length * 3), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(parts_.length * 3), 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.011, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  pts.frustumCulled = false;
+  pts.visible = false;
+  pts.renderOrder = 5;
+  ps4.add(pts);
+  f.points = pts; f.particles = parts_;
+}
+const _fp = new THREE.Vector3(), _fc = new THREE.Color();
+function updateFlow(f, t, fade) {
+  const pos = f.points.geometry.attributes.position.array, col = f.points.geometry.attributes.color.array;
+  f.particles.forEach((q, i) => {
+    const d = (q.phase + t * q.speed) % q.L;
+    let k = 1;
+    while (k < q.cum.length - 1 && q.cum[k] < d) k++;
+    const a = q.pts[k - 1], b = q.pts[k];
+    const u = (d - q.cum[k - 1]) / Math.max(1e-6, q.cum[k] - q.cum[k - 1]);
+    _fp.lerpVectors(a.v, b.v, u).add(q.jit);
+    gradColor(f.grad, a.s + (b.s - a.s) * u, _fc).multiplyScalar(Math.min(1, d / 12, (q.L - d) / 12) * fade);
+    pos[i * 3] = _fp.x; pos[i * 3 + 1] = _fp.y; pos[i * 3 + 2] = _fp.z;
+    col[i * 3] = _fc.r; col[i * 3 + 1] = _fc.g; col[i * 3 + 2] = _fc.b;
+  });
+  f.points.geometry.attributes.position.needsUpdate = true;
+  f.points.geometry.attributes.color.needsUpdate = true;
+}
+
+// ================================================================ Maßlinien
+const dimPts = [];
+const seg = (a, b) => dimPts.push(V(...a), V(...b));
+const zf0 = zF(0) + 22, xr = W2 + 22;
+seg([-W2, 0, zf0], [W2, 0, zf0]); seg([-W2, 0, zF(0)], [-W2, 0, zf0 + 6]); seg([W2, 0, zF(0)], [W2, 0, zf0 + 6]);
+seg([xr, 0, zB(0)], [xr, 0, zF(0)]); seg([W2, 0, zB(0)], [xr + 6, 0, zB(0)]); seg([W2, 0, zF(0)], [xr + 6, 0, zF(0)]);
+seg([xr, 0, zB(0)], [xr, 53, zB(0)]); seg([W2, 53, zB(53)], [xr + 6, 53, zB(0)]);
+for (const [x, z, ax] of [[-W2, zf0, 'z'], [W2, zf0, 'z'], [xr, zB(0), 'x'], [xr, zF(0), 'x']]) {
+  if (ax === 'z') seg([x - 4, 0, z - 4], [x + 4, 0, z + 4]); else seg([x - 4, 0, z - 4], [x + 4, 0, z + 4]);
+}
+seg([xr - 4, 53, zB(0) - 4], [xr + 4, 53, zB(0) + 4]); seg([xr - 4, 0, zB(0) - 4], [xr + 4, 0, zB(0) + 4]);
+const dimLines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(dimPts), new THREE.LineBasicMaterial({ color: 0xffd080, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+dimLines.visible = false;
+ps4.add(dimLines);
+
+// ================================================================ Panels & Beschriftungen (Canvas-Texturen)
 const ui = new THREE.Group();
 scene.add(ui);
 
-function makePanel(wm, hm, wpx, hpx) {
+function makeCanvasPlane(wm, hm, wpx, hpx, parent = ui) {
   const canvas = document.createElement('canvas');
   canvas.width = wpx; canvas.height = hpx;
   const tex = new THREE.CanvasTexture(canvas);
@@ -393,12 +906,12 @@ function makePanel(wm, hm, wpx, hpx) {
   tex.anisotropy = 4;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wm, hm), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   mesh.renderOrder = 10;
-  ui.add(mesh);
-  return { canvas, ctx: canvas.getContext('2d'), tex, mesh, wm, hm, buttons: [], hover: -1, flash: -1 };
+  parent.add(mesh);
+  return { canvas, ctx: canvas.getContext('2d'), tex, mesh, wm, hm, regions: [], hover: null, flash: null };
 }
 function frame(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(2, 22, 34, 0.72)';
+  ctx.fillStyle = 'rgba(2, 20, 32, 0.78)';
   ctx.fillRect(6, 6, w - 12, h - 12);
   ctx.strokeStyle = 'rgba(111, 230, 255, 0.55)'; ctx.lineWidth = 3;
   ctx.strokeRect(6, 6, w - 12, h - 12);
@@ -408,78 +921,202 @@ function frame(ctx, w, h) {
     ctx.beginPath(); ctx.moveTo(x + dx * c, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * c); ctx.stroke();
   }
 }
-function wrap(ctx, text, x, y, maxW, lh) {
+function wrap(ctx, text, x, y, maxW, lh, draw = true) {
   let line = '';
   for (const word of text.split(' ')) {
     const t = line ? line + ' ' + word : word;
-    if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = word; }
+    if (ctx.measureText(t).width > maxW && line) { if (draw) ctx.fillText(line, x, y); y += lh; line = word; }
     else line = t;
   }
-  if (line) { ctx.fillText(line, x, y); y += lh; }
+  if (line) { if (draw) ctx.fillText(line, x, y); y += lh; }
   return y;
 }
+const hex = c => '#' + new THREE.Color(c).getHexString();
 
-// Steuer-Panel
-const ctrl = makePanel(0.22, 0.36, 440, 720);
-const state = { explode: 1.3, explodeTarget: 0, holo: true, spin: false };
-ctrl.buttons = [
-  { id: 'explode', label: () => state.explodeTarget > 0.5 ? 'ZUSAMMENBAUEN' : 'AUFZIEHEN' },
-  { id: 'reset', label: () => 'TEILE ZURÜCK' },
-  { id: 'mode', label: () => state.holo ? 'ANSICHT: HOLOGRAMM' : 'ANSICHT: ECHT' },
-  { id: 'spin', label: () => state.spin ? 'DREHEN: AN' : 'DREHEN: AUS' },
-  { id: 'bigger', label: () => 'GRÖSSER  +' },
-  { id: 'smaller', label: () => 'KLEINER  −' },
-  { id: 'here', label: () => 'ZU MIR HOLEN' },
-].map((b, i) => ({ ...b, x: 40, y: 110 + i * 84, w: 360, h: 68 }));
+// --- Steuer-Panel mit Knöpfen und Teileliste
+const state = { explode: 1.3, explodeTarget: 0, holo: true, spin: false, labels: true, flow: 0, dims: false, hideCase: false };
+const ctrl = makeCanvasPlane(0.48, 0.352, 1200, 880);
+const BUTTONS = [
+  ['explode', () => state.explodeTarget > 0.5 ? 'ZUSAMMENBAUEN' : 'AUFZIEHEN'],
+  ['reset', () => 'TEILE ZURÜCKLEGEN'],
+  ['flow', () => 'FLUSS: ' + ['AUS', 'LUFT', 'STROM', 'DATEN'][state.flow]],
+  ['labels', () => 'BESCHRIFTUNG: ' + (state.labels ? 'AN' : 'AUS')],
+  ['dims', () => 'MASSE: ' + (state.dims ? 'AN' : 'AUS')],
+  ['case', () => 'GEHÄUSE: ' + (state.hideCase ? 'AUS' : 'AN')],
+  ['mode', () => 'ANSICHT: ' + (state.holo ? 'HOLOGRAMM' : 'ECHT')],
+  ['spin', () => 'DREHEN: ' + (state.spin ? 'AN' : 'AUS')],
+  ['size', null],
+  ['here', () => 'ZU MIR HOLEN'],
+  ['deselect', () => 'AUSWAHL AUFHEBEN'],
+];
+{
+  let y = 96;
+  for (const [id] of BUTTONS) {
+    if (id === 'size') { ctrl.regions.push({ id: 'b:smaller', x: 30, y, w: 178, h: 58 }, { id: 'b:bigger', x: 222, y, w: 178, h: 58 }); }
+    else ctrl.regions.push({ id: 'b:' + id, x: 30, y, w: 370, h: 58 });
+    y += 68;
+  }
+  const colA = ['Gehäuse', 'Strom', 'Kühlung'], colB = ['Elektronik', 'Laufwerke'];
+  for (const [cats, x] of [[colA, 430], [colB, 815]]) {
+    let yy = 96;
+    for (const cat of cats) {
+      ctrl.regions.push({ id: 'h:' + cat, x, y: yy, w: 355, h: 42, header: true });
+      yy += 42;
+      for (const p of parts.filter(q => q.cat === cat)) { ctrl.regions.push({ id: 'p:' + p.id, x, y: yy, w: 355, h: 42 }); yy += 44; }
+      yy += 6;
+    }
+  }
+}
 function drawCtrl() {
   const { ctx, canvas } = ctrl;
   frame(ctx, canvas.width, canvas.height);
   ctx.fillStyle = '#6fe6ff'; ctx.font = '600 34px system-ui, sans-serif';
-  ctx.fillText('STEUERUNG', 40, 70);
-  ctrl.buttons.forEach((b, i) => {
-    const on = ctrl.flash === i, hov = ctrl.hover === i;
-    ctx.fillStyle = on ? 'rgba(255,179,65,0.55)' : hov ? 'rgba(79,216,255,0.35)' : 'rgba(79,216,255,0.12)';
-    ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = on ? '#ffb341' : '#4fd8ff'; ctx.lineWidth = 3;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-    ctx.fillStyle = on ? '#fff2d8' : '#d8f7ff'; ctx.font = '600 28px system-ui, sans-serif';
-    ctx.fillText(b.label(), b.x + 22, b.y + 45);
-  });
+  ctx.fillText('STEUERUNG', 34, 66);
+  ctx.fillText('BAUTEILE (' + parts.length + ')', 434, 66);
+  ctx.strokeStyle = 'rgba(111,230,255,0.35)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(415, 40); ctx.lineTo(415, 840); ctx.stroke();
+  for (const r of ctrl.regions) {
+    const [kind, id] = r.id.split(':');
+    if (kind === 'h') {
+      ctx.fillStyle = '#ffb341'; ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillText(id.toUpperCase(), r.x + 4, r.y + 30);
+      ctx.fillStyle = 'rgba(255,179,65,0.4)'; ctx.fillRect(r.x + 4, r.y + 38, r.w - 8, 2);
+      continue;
+    }
+    const on = ctrl.flash === r.id, hov = ctrl.hover === r.id;
+    const sel = kind === 'p' && selected?.id === id;
+    if (kind === 'b') {
+      ctx.fillStyle = on ? 'rgba(255,179,65,0.55)' : hov ? 'rgba(79,216,255,0.35)' : 'rgba(79,216,255,0.12)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = on ? '#ffb341' : '#4fd8ff'; ctx.lineWidth = 3;
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = on ? '#fff2d8' : '#d8f7ff'; ctx.font = '600 25px system-ui, sans-serif';
+      const label = id === 'smaller' ? 'KLEINER  −' : id === 'bigger' ? 'GRÖSSER  +' : BUTTONS.find(b => b[0] === id)[1]();
+      ctx.fillText(label, r.x + 18, r.y + 38);
+    } else {
+      const p = byId[id];
+      ctx.fillStyle = sel ? 'rgba(255,179,65,0.35)' : hov ? 'rgba(79,216,255,0.3)' : p.detached ? 'rgba(79,216,255,0.1)' : 'rgba(0,0,0,0)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      if (sel) { ctx.strokeStyle = '#ffb341'; ctx.lineWidth = 2; ctx.strokeRect(r.x, r.y, r.w, r.h); }
+      ctx.fillStyle = sel ? '#ffe2b0' : '#cdf4ff'; ctx.font = (sel ? '600 ' : '') + '24px system-ui, sans-serif';
+      ctx.fillText(p.name, r.x + 14, r.y + 29);
+      if (p.detached) { ctx.fillStyle = '#4fd8ff'; ctx.font = '20px system-ui'; ctx.fillText('◆', r.x + r.w - 28, r.y + 28); }
+    }
+  }
   ctrl.tex.needsUpdate = true;
 }
 
-// Info-Panel
-const info = makePanel(0.36, 0.25, 900, 625);
+// --- Info-Panel
+const info = makeCanvasPlane(0.42, 0.40, 1050, 1000);
 let selected = null;
+function drawTable(ctx, rows, x, y, w) {
+  ctx.font = '25px system-ui, sans-serif';
+  for (const [k, v] of rows) {
+    ctx.fillStyle = 'rgba(79,216,255,0.08)'; ctx.fillRect(x - 10, y - 28, w + 20, 40);
+    ctx.fillStyle = '#7fcfe6'; ctx.fillText(k, x, y);
+    ctx.fillStyle = '#ffffff';
+    const yy = wrap(ctx, v, x + 300, y, w - 300, 32);
+    y = Math.max(y + 42, yy + 10);
+  }
+  return y;
+}
+function factBox(ctx, title, text, x, y, w, color = '#ffb341') {
+  ctx.font = '25px system-ui, sans-serif';
+  const h = wrap(ctx, text, 0, 0, w - 40, 33, false) + 58;
+  ctx.fillStyle = color === '#ffb341' ? 'rgba(255,179,65,0.12)' : 'rgba(79,216,255,0.1)';
+  ctx.fillRect(x - 10, y, w + 20, h);
+  ctx.fillStyle = color; ctx.fillRect(x - 10, y, 6, h);
+  ctx.font = '600 22px system-ui, sans-serif'; ctx.fillText(title, x + 10, y + 34);
+  ctx.fillStyle = '#fff2d8'; ctx.font = '25px system-ui, sans-serif';
+  wrap(ctx, text, x + 10, y + 70, w - 40, 33);
+  return y + h + 16;
+}
 function drawInfo() {
   const { ctx, canvas } = info;
   frame(ctx, canvas.width, canvas.height);
-  const x = 44;
-  if (!selected) {
-    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 46px system-ui, sans-serif';
-    ctx.fillText('PLAYSTATION 4 · CUH-1000', x, 84);
-    ctx.fillStyle = '#bfefff'; ctx.font = '30px system-ui, sans-serif';
-    let y = wrap(ctx, 'Greif mit Daumen und Zeigefinger in ein Teil, um es rauszunehmen und dir anzuschauen. Mit beiden Händen gleichzeitig reingreifen und auseinanderziehen, um die Konsole aufzuziehen.', x, 150, 810, 42);
-    y += 14;
-    ctx.fillStyle = '#ffb341';
-    wrap(ctx, 'Den Sockelring greifen: verschieben und drehen. Zwei Hände am Ring: größer oder kleiner ziehen.', x, y, 810, 42);
-  } else {
+  const x = 50, w = 950;
+  const flow = FLOWS[flowOrder[state.flow]];
+  if (selected) {
     const i = selected.info;
+    const idx = parts.indexOf(selected) + 1;
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText(`${selected.cat.toUpperCase()} · BAUTEIL ${idx}/${parts.length}`, x, 66);
     ctx.fillStyle = '#ffb341'; ctx.font = '600 50px system-ui, sans-serif';
-    ctx.fillText(selected.name.toUpperCase(), x, 84);
-    ctx.fillStyle = '#6fe6ff'; ctx.font = 'italic 28px system-ui, sans-serif';
-    ctx.fillText(i.sub, x, 128);
-    ctx.fillStyle = '#d8f7ff'; ctx.font = '28px system-ui, sans-serif';
-    let y = wrap(ctx, i.text, x, 180, 810, 38) + 12;
-    ctx.font = '26px system-ui, sans-serif';
-    for (const f of i.facts) { ctx.fillStyle = '#4fd8ff'; ctx.fillText('▸', x, y); ctx.fillStyle = '#bfefff'; y = wrap(ctx, f, x + 30, y, 780, 34) + 4; }
+    ctx.fillText(selected.name.toUpperCase(), x, 124, w);
+    ctx.fillStyle = '#6fe6ff'; ctx.font = 'italic 27px system-ui, sans-serif';
+    ctx.fillText(i.sub, x, 166, w);
+    ctx.fillStyle = '#d8f7ff'; ctx.font = '26px system-ui, sans-serif';
+    let y = wrap(ctx, i.text, x, 216, w, 35) + 18;
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('TECHNISCHE DATEN', x, y); y += 44;
+    y = drawTable(ctx, i.specs, x, y, w) + 6;
+    factBox(ctx, 'WUSSTEST DU?', i.fact, x, y, w);
+  } else if (flow) {
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('FLUSS-ANSICHT', x, 66);
+    ctx.fillStyle = '#ffb341'; ctx.font = '600 50px system-ui, sans-serif';
+    ctx.fillText(flow.title, x, 124);
+    ctx.fillStyle = '#d8f7ff'; ctx.font = '27px system-ui, sans-serif';
+    let y = wrap(ctx, flow.text, x, 180, w, 37) + 20;
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('LEGENDE', x, y); y += 46;
+    for (const [c, t] of flow.legend) {
+      ctx.fillStyle = hex(c); ctx.beginPath(); ctx.arc(x + 14, y - 9, 12, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.font = '26px system-ui, sans-serif'; ctx.fillText(t, x + 44, y); y += 46;
+    }
+    factBox(ctx, 'MERKE', flow.tip, x, y + 10, w);
+  } else {
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('ÜBERSICHT', x, 66);
+    ctx.fillStyle = '#ffb341'; ctx.font = '600 50px system-ui, sans-serif';
+    ctx.fillText('PLAYSTATION 4 · CUH-1000', x, 124);
+    ctx.fillStyle = '#6fe6ff'; ctx.font = 'italic 27px system-ui, sans-serif';
+    ctx.fillText('Das Originalmodell von 2013, zerlegt in 24 Bauteile', x, 166);
+    let y = drawTable(ctx, [
+      ['Marktstart', '15.11.2013 (USA), 29.11.2013 (Europa)'], ['Startpreis', '399 €'],
+      ['CPU', '8 × AMD Jaguar, 1,6 GHz'], ['GPU', 'AMD GCN, 18 CUs, 1,84 TFLOPS'],
+      ['Arbeitsspeicher', '8 GB GDDR5, 176 GB/s'], ['Festplatte', '500 GB, 2,5 Zoll (tauschbar)'],
+      ['Laufwerk', 'Blu-ray 6×, DVD 8×'], ['Anschlüsse', '2 × USB 3.0, HDMI, LAN, Optisch, AUX'],
+      ['Funk', 'WLAN b/g/n, Bluetooth 2.1'], ['Verbrauch', 'ca. 140–150 W beim Spielen'],
+      ['Verkauft', 'über 117 Mio. PS4 (alle Modelle)'],
+    ], x, 222, w);
+    factBox(ctx, 'SO GEHT’S', 'Greif ein Teil oder tippe es links in der Liste an. Mit FLUSS siehst du, wie Luft, Strom und Daten durch die Konsole wandern.', x, y + 4, w, '#4fd8ff');
   }
   info.tex.needsUpdate = true;
 }
 
+// --- 3D-Beschriftungen mit Linien
+const labels = [];
+function makeLabel(text, style) {
+  const ctx0 = document.createElement('canvas').getContext('2d');
+  ctx0.font = '600 40px system-ui, sans-serif';
+  const tw = Math.ceil(ctx0.measureText(text).width) + 50;
+  const L = makeCanvasPlane(tw / 1000 * 0.2, 0.2 * 64 / 1000, tw, 64, scene);
+  const { ctx } = L;
+  const col = style === 'dim' ? '#ffd080' : style === 'flow' ? '#ffffff' : '#9feeff';
+  ctx.fillStyle = style === 'dim' ? 'rgba(40,28,4,0.8)' : 'rgba(2,20,32,0.8)'; ctx.fillRect(0, 0, tw, 64);
+  ctx.fillStyle = col; ctx.fillRect(0, 0, 6, 64);
+  ctx.font = '600 40px system-ui, sans-serif'; ctx.fillStyle = col;
+  ctx.fillText(text, 22, 46);
+  L.tex.needsUpdate = true;
+  L.mesh.material.depthTest = false;
+  L.mesh.renderOrder = 15;
+  L.mesh.visible = false;
+  L.anchor = new THREE.Vector3(); L.pos = new THREE.Vector3(); L.line = false;
+  labels.push(L);
+  return L;
+}
+for (const p of parts) p.label = makeLabel(p.name, 'part');
+for (const f of Object.values(FLOWS)) f.labelObjs = f.labels.map(([t, pos]) => ({ L: makeLabel(t, 'flow'), pos: V(...pos) }));
+const dimLabels = [['275 mm', V(0, 0, zF(0) + 34)], ['305 mm', V(W2 + 40, 0, 0)], ['53 mm', V(W2 + 40, 26, zB(0))]].map(([t, pos]) => ({ L: makeLabel(t, 'dim'), pos }));
+const leaderGeo = new THREE.BufferGeometry();
+leaderGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(labels.length * 6), 3));
+const leaders = new THREE.LineSegments(leaderGeo, new THREE.LineBasicMaterial({ color: 0x9feeff, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+leaders.frustumCulled = false; leaders.renderOrder = 14;
+scene.add(leaders);
+
 // Namensschild über dem ausgewählten Teil
-const tagPanel = makePanel(0.2, 0.045, 600, 135);
-scene.add(tagPanel.mesh);
+const tagPanel = makeCanvasPlane(0.2, 0.045, 600, 135, scene);
 tagPanel.mesh.visible = false;
 tagPanel.mesh.material.depthTest = false;
 tagPanel.mesh.renderOrder = 20;
@@ -487,10 +1124,10 @@ function drawTag() {
   const { ctx, canvas } = tagPanel;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!selected) return;
-  ctx.fillStyle = 'rgba(40, 24, 2, 0.75)'; ctx.fillRect(4, 4, canvas.width - 8, canvas.height - 8);
+  ctx.fillStyle = 'rgba(40, 24, 2, 0.8)'; ctx.fillRect(4, 4, canvas.width - 8, canvas.height - 8);
   ctx.strokeStyle = '#ffb341'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
-  ctx.fillStyle = '#ffe2b0'; ctx.font = '600 52px system-ui, sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(selected.name, canvas.width / 2, 86, canvas.width - 30);
+  ctx.fillStyle = '#ffe2b0'; ctx.font = '600 50px system-ui, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(selected.name, canvas.width / 2, 84, canvas.width - 30);
   ctx.textAlign = 'left';
   tagPanel.tex.needsUpdate = true;
 }
@@ -498,31 +1135,41 @@ function drawTag() {
 function select(p) {
   if (selected === p) return;
   selected = p;
-  drawInfo(); drawTag();
+  drawInfo(); drawTag(); drawCtrl();
 }
 drawCtrl(); drawInfo();
 
-// ---------------------------------------------------------------- Aktionen
+// ================================================================ Aktionen
 function setHolo(on) {
   state.holo = on;
   for (const m of allMeshes) {
-    m.material = on ? m.userData.part.holoMat : m.userData.real;
+    m.material = on ? m.userData.holo : m.userData.real;
     m.userData.edges.visible = on;
   }
   scene.environment = on ? null : envMap;
 }
-function clickButton(id) {
+function setCase(hide) {
+  state.hideCase = hide;
+  for (const id of ['top', 'gloss', 'light']) byId[id].group.visible = !hide;
+}
+function clickRegion(id) {
+  const [kind, key] = id.split(':');
   blip(1200, 0.06);
-  if (id === 'explode') state.explodeTarget = state.explodeTarget > 0.5 ? 0 : 1;
-  if (id === 'reset') for (const p of parts) if (!p.grabbed) p.detached = false;
-  if (id === 'mode') setHolo(!state.holo);
-  if (id === 'spin') state.spin = !state.spin;
-  if (id === 'bigger') setScale(S * 1.2);
-  if (id === 'smaller') setScale(S / 1.2);
-  if (id === 'here') placeInFront();
-  const i = ctrl.buttons.findIndex(b => b.id === id);
-  ctrl.flash = i; drawCtrl();
-  setTimeout(() => { if (ctrl.flash === i) { ctrl.flash = -1; drawCtrl(); } }, 180);
+  if (kind === 'p') { select(selected?.id === key ? null : byId[key]); return; }
+  if (key === 'explode') state.explodeTarget = state.explodeTarget > 0.5 ? 0 : 1;
+  if (key === 'reset') for (const p of parts) if (!p.grabbed) p.detached = false;
+  if (key === 'mode') setHolo(!state.holo);
+  if (key === 'spin') state.spin = !state.spin;
+  if (key === 'labels') state.labels = !state.labels;
+  if (key === 'dims') { state.dims = !state.dims; if (state.dims) state.explodeTarget = 0; }
+  if (key === 'case') setCase(!state.hideCase);
+  if (key === 'flow') { state.flow = (state.flow + 1) % 4; if (state.flow) { state.explodeTarget = 0; select(null); } drawInfo(); }
+  if (key === 'bigger') setScale(S * 1.2);
+  if (key === 'smaller') setScale(S / 1.2);
+  if (key === 'here') placeInFront();
+  if (key === 'deselect') select(null);
+  ctrl.flash = id; drawCtrl();
+  setTimeout(() => { if (ctrl.flash === id) { ctrl.flash = null; drawCtrl(); } }, 180);
 }
 function setScale(s) { S = THREE.MathUtils.clamp(s, 0.3, 5); modelRoot.scale.setScalar(S); }
 
@@ -534,12 +1181,12 @@ function placeInFront() {
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q); fwd.y = 0;
   if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
   fwd.normalize();
-  modelRoot.position.copy(pos).addScaledVector(fwd, 0.6);
-  modelRoot.position.y = Math.max(0.3, pos.y - 0.5);
+  modelRoot.position.copy(pos).addScaledVector(fwd, 0.7);
+  modelRoot.position.y = Math.max(0.3, pos.y - 0.55);
   modelRoot.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
 }
 
-// ---------------------------------------------------------------- Sound
+// ================================================================ Sound & Haptik
 let actx = null;
 function ensureAudio() { try { actx = actx || new AudioContext(); actx.resume(); } catch (e) {} }
 function blip(f = 880, d = 0.08, type = 'sine', vol = 0.05) {
@@ -557,10 +1204,9 @@ function haptic(inp, strength = 0.4, ms = 30) {
   try { inp.source?.gamepad?.hapticActuators?.[0]?.pulse(strength, ms); } catch (e) {}
 }
 
-// ---------------------------------------------------------------- Eingabe (Hände + Controller)
+// ================================================================ Eingabe (Hände + Controller)
 const NEAR = 0.025;
 const tv = new THREE.Vector3(), tv2 = new THREE.Vector3(), tq = new THREE.Quaternion(), tm = new THREE.Matrix4(), inv = new THREE.Matrix4();
-const ONE = new THREE.Vector3(1, 1, 1);
 const raycaster = new THREE.Raycaster();
 
 const inputs = [0, 1].map(i => {
@@ -572,7 +1218,7 @@ const inputs = [0, 1].map(i => {
   const cursor = new THREE.Mesh(new THREE.SphereGeometry(0.006, 12, 8), addMat(0xffffff, 0.9));
   const dot = new THREE.Mesh(new THREE.SphereGeometry(0.005, 12, 8), addMat(0x6fe6ff, 0.9));
   scene.add(cursor, dot);
-  const inp = { i, ray, grip, hand, line, cursor, dot, source: null, isHand: false, pinching: false, grab: null, poke: false, hoverPart: null, hoverBase: false };
+  const inp = { i, ray, grip, hand, line, cursor, dot, source: null, isHand: false, pinching: false, grab: null, poke: false };
   ray.addEventListener('connected', e => { inp.source = e.data; inp.isHand = !!e.data.hand; });
   ray.addEventListener('disconnected', () => { release(inp); inp.source = null; inp.isHand = false; });
   ray.addEventListener('selectstart', () => { if (!inp.isHand) press(inp); });
@@ -608,24 +1254,27 @@ function grabPose(inp, far, out) {
 }
 function yawPose(M, prevYaw) { // nur Position + Drehung um die Hochachse
   const p = new THREE.Vector3(), q = new THREE.Quaternion();
-  M.decompose(p, q, tv);
+  M.decompose(p, q, new THREE.Vector3());
   const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
   const yaw = Math.hypot(f.x, f.z) > 0.2 ? Math.atan2(f.x, f.z) : prevYaw;
   return { yaw, m: new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), yaw), ONE) };
 }
 
-function partDistance(p, pt) {
+const visibleParts = () => parts.filter(p => p.group.visible);
+const _lp = new THREE.Vector3(), _cp = new THREE.Vector3();
+function partDistance(p, pt) { // Abstand in Metern zur nächsten Grundform des Teils
+  inv.copy(p.group.matrixWorld).invert();
+  _lp.copy(pt).applyMatrix4(inv);
   let best = Infinity;
-  for (const m of p.meshes) {
-    inv.copy(m.matrixWorld).invert();
-    tv.copy(pt).applyMatrix4(inv).clamp(m.geometry.boundingBox.min, m.geometry.boundingBox.max).applyMatrix4(m.matrixWorld);
-    best = Math.min(best, tv.distanceTo(pt));
+  for (const c of p.colliders) {
+    _cp.copy(_lp).applyMatrix4(c.inv).clamp(c.box.min, c.box.max).applyMatrix4(c.m);
+    best = Math.min(best, _cp.distanceToSquared(_lp));
   }
-  return best;
+  return Math.sqrt(best) * p.group.matrixWorld.getMaxScaleOnAxis();
 }
 function nearestPart(pt, maxD) {
   let best = null, bd = Infinity, bv = Infinity;
-  for (const p of parts) {
+  for (const p of visibleParts()) {
     if (p.grabbed) continue;
     const d = Math.max(0, partDistance(p, pt) - 0.004);
     if (d > maxD) continue;
@@ -638,26 +1287,28 @@ function onBase(pt) {
   return Math.hypot(tv.x, tv.z) < 0.27 && tv.y > -0.04 && tv.y < 0.025;
 }
 function inModel(pt, pad) {
-  const b = new THREE.Box3().setFromObject(ps4).expandByScalar(pad);
-  return b.containsPoint(pt);
+  const b = new THREE.Box3();
+  for (const p of visibleParts()) b.union(p.localBox.clone().applyMatrix4(p.group.matrixWorld));
+  return b.expandByScalar(pad).containsPoint(pt);
+}
+function regionAt(panel, u, v) {
+  const px = u * panel.canvas.width, py = (1 - v) * panel.canvas.height;
+  return panel.regions.find(r => !r.header && px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h)?.id || null;
 }
 function rayHit(origin, dir) {
   raycaster.set(origin, dir);
-  const hits = raycaster.intersectObjects([ctrl.mesh, baseDisk, ...allMeshes.filter(m => !m.userData.part.grabbed)], false);
+  const hits = raycaster.intersectObjects([ctrl.mesh, baseDisk, ...allMeshes.filter(m => { const p = m.userData.part; return !p.grabbed && p.group.visible; })], false);
   for (const h of hits) {
-    if (h.object === ctrl.mesh) {
-      const px = h.uv.x * ctrl.canvas.width, py = (1 - h.uv.y) * ctrl.canvas.height;
-      const bi = ctrl.buttons.findIndex(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
-      return { kind: 'button', bi, dist: h.distance };
-    }
+    if (h.object === ctrl.mesh) return { kind: 'ui', region: regionAt(ctrl, h.uv.x, h.uv.y), dist: h.distance };
     if (h.object === baseDisk) return { kind: 'base', dist: h.distance };
     return { kind: 'part', part: h.object.userData.part, dist: h.distance };
   }
   return null;
 }
 function inputRay(inp) {
-  inp.ray.matrixWorld.decompose(tv, tq, tv2);
-  return { o: tv.clone(), d: V(0, 0, -1).applyQuaternion(tq).normalize() };
+  const p = new THREE.Vector3(), q = new THREE.Quaternion();
+  inp.ray.matrixWorld.decompose(p, q, new THREE.Vector3());
+  return { o: p, d: V(0, 0, -1).applyQuaternion(q).normalize() };
 }
 
 const now = () => performance.now();
@@ -678,7 +1329,7 @@ function press(inp) {
   const { o, d } = inputRay(inp);
   const hit = rayHit(o, d);
   if (!hit) return;
-  if (hit.kind === 'button') { if (hit.bi >= 0) clickButton(ctrl.buttons[hit.bi].id); inp.grab = { type: 'ui' }; return; }
+  if (hit.kind === 'ui') { if (hit.region) clickRegion(hit.region); inp.grab = { type: 'ui' }; return; }
   if (hit.kind === 'base') return startModelGrab(inp, true);
   if (hit.kind === 'part') return startPartGrab(inp, hit.part, true);
 }
@@ -695,9 +1346,11 @@ function release(inp) {
     const ang = 2 * Math.acos(Math.min(1, Math.abs(p.group.quaternion.w)));
     if (p.group.position.distanceTo(home) < 35 && ang < 0.6) { p.detached = false; blip(660, 0.1, 'triangle'); haptic(inp, 0.6, 50); }
     else p.detached = true;
+    drawCtrl();
   } else if (g.type === 'explode') {
     other.grab = null;
     if (state.explode < 0.06) state.explodeTarget = 0;
+    drawCtrl();
     blip(520, 0.08);
   } else if (g.type === 'scale') {
     other.grab = null;
@@ -797,20 +1450,18 @@ function updatePoke() { // Knöpfe mit der Zeigefingerspitze antippen
     if (!f) continue;
     f.getWorldPosition(tv);
     ctrl.mesh.worldToLocal(tv);
-    const u = tv.x / ctrl.wm + 0.5, v = 0.5 - tv.y / ctrl.hm;
-    const px = u * ctrl.canvas.width, py = v * ctrl.canvas.height;
-    const bi = ctrl.buttons.findIndex(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
-    if (bi >= 0 && Math.abs(tv.z) < 0.012 && !inp.poke && !inp.grab) {
+    const region = Math.abs(tv.x) < ctrl.wm / 2 && Math.abs(tv.y) < ctrl.hm / 2 ? regionAt(ctrl, tv.x / ctrl.wm + 0.5, tv.y / ctrl.hm + 0.5) : null;
+    if (region && Math.abs(tv.z) < 0.012 && !inp.poke && !inp.grab) {
       inp.poke = true;
-      clickButton(ctrl.buttons[bi].id);
+      clickRegion(region);
       haptic(inp);
-    } else if (bi < 0 || Math.abs(tv.z) > 0.03) inp.poke = false;
+    } else if (!region || Math.abs(tv.z) > 0.03) inp.poke = false;
   }
 }
 
 function updateHover() {
   for (const p of parts) p.hover = 0;
-  let baseHover = false, btnHover = -1;
+  let baseHover = false, uiHover = null;
   for (const inp of inputs) {
     inp.line.visible = inp.cursor.visible = inp.dot.visible = false;
     if (!inp.source) continue;
@@ -825,8 +1476,8 @@ function updateHover() {
         if (p) { p.hover = 1; nearSomething = true; }
         else if (onBase(pt)) { baseHover = true; nearSomething = true; }
       }
-      nearSomething ||= inModel(pt, 0.08);
       inp.dot.material.color.set(nearSomething && !inp.grab ? 0xffb341 : 0x6fe6ff);
+      nearSomething ||= inModel(pt, 0.08);
     }
     if (inp.grab && !inp.grab.far) continue;
     if (inp.isHand && nearSomething) continue;
@@ -840,22 +1491,22 @@ function updateHover() {
       inp.cursor.position.copy(o).addScaledVector(d, hit.dist);
       if (hit.kind === 'part') hit.part.hover = 1;
       if (hit.kind === 'base') baseHover = true;
-      if (hit.kind === 'button') btnHover = hit.bi;
+      if (hit.kind === 'ui') uiHover = hit.region;
     }
   }
   baseRing.material.opacity = baseHover ? 1 : 0.7;
   baseDisk.material.opacity = baseHover ? 0.16 : 0.07;
-  if (btnHover !== ctrl.hover) { ctrl.hover = btnHover; drawCtrl(); }
+  if (uiHover !== ctrl.hover) { ctrl.hover = uiHover; drawCtrl(); }
 }
 
-// ---------------------------------------------------------------- Desktop-Maus (zum Testen am PC)
+// ================================================================ Desktop-Maus (zum Testen am PC)
 const mouse = { down: null };
 renderer.domElement.addEventListener('pointerdown', e => { mouse.down = [e.clientX, e.clientY]; });
 renderer.domElement.addEventListener('pointerup', e => {
   if (!mouse.down || Math.hypot(e.clientX - mouse.down[0], e.clientY - mouse.down[1]) > 5) return;
   ensureAudio();
   const hit = mouseHit(e);
-  if (hit?.kind === 'button' && hit.bi >= 0) clickButton(ctrl.buttons[hit.bi].id);
+  if (hit?.kind === 'ui') { if (hit.region) clickRegion(hit.region); }
   else if (hit?.kind === 'part') select(hit.part);
   else select(null);
 });
@@ -866,19 +1517,22 @@ function mouseHit(e) {
   raycaster.setFromCamera(ndc, camera);
   return rayHit(raycaster.ray.origin.clone(), raycaster.ray.direction.clone());
 }
-addEventListener('keydown', e => { if (e.key === 'e') clickButton('explode'); if (e.key === 'h') clickButton('mode'); });
+addEventListener('keydown', e => {
+  const map = { e: 'b:explode', h: 'b:mode', f: 'b:flow', l: 'b:labels', m: 'b:dims', g: 'b:case', r: 'b:reset' };
+  if (map[e.key]) { ensureAudio(); clickRegion(map[e.key]); }
+});
 
-// ---------------------------------------------------------------- XR-Start
+// ================================================================ XR-Start
 const startBtn = document.getElementById('start'), msg = document.getElementById('msg'), overlay = document.getElementById('overlay');
 document.getElementById('hide').onclick = () => overlay.style.display = 'none';
 let xrMode = null;
 (async () => {
-  if (!navigator.xr) { startBtn.disabled = true; msg.textContent = window.isSecureContext ? 'Dieser Browser kann kein WebXR. Am PC kannst du das Modell mit der Maus ansehen.' : 'WebXR braucht HTTPS. Auf der Quest die https://…:8443-Adresse benutzen.'; return; }
+  if (!navigator.xr) { startBtn.disabled = true; msg.textContent = window.isSecureContext ? 'Dieser Browser kann kein WebXR. Am PC kannst du das Modell mit der Maus ansehen.' : 'WebXR braucht HTTPS.'; return; }
   if (await navigator.xr.isSessionSupported('immersive-ar')) xrMode = 'immersive-ar';
   else if (await navigator.xr.isSessionSupported('immersive-vr')) { xrMode = 'immersive-vr'; msg.textContent = 'Kein Passthrough verfügbar, startet in VR.'; }
-  else { startBtn.disabled = true; msg.textContent = 'Kein VR-Headset gefunden. Am PC: Maus zum Drehen, Klick auf Teile, Taste E = aufziehen.'; }
+  else { startBtn.disabled = true; msg.textContent = 'Kein VR-Headset gefunden. Am PC: Maus zum Drehen, Klick auf Teile.'; }
 })();
-let placeFrames = -1;
+let placeFrames = -1, bootT = 0;
 startBtn.onclick = async () => {
   ensureAudio();
   try {
@@ -892,10 +1546,23 @@ startBtn.onclick = async () => {
   } catch (err) { msg.textContent = 'Start fehlgeschlagen: ' + err.message; }
 };
 
-// ---------------------------------------------------------------- Loop
-let last = performance.now(), bootT = 0;
-const target = new THREE.Vector3(), tagPos = new THREE.Vector3();
-renderer.setAnimationLoop(() => {
+window.__ps4 = { FLOWS, state, parts, ps4, modelRoot, camera, controls, clickRegion }; // zum Debuggen in der Konsole
+
+// ================================================================ Loop
+let last = performance.now();
+const target = new THREE.Vector3(), tagPos = new THREE.Vector3(), camQ = new THREE.Quaternion(), mq = new THREE.Quaternion();
+const _w = new THREE.Vector3(), _o = new THREE.Vector3();
+function placeLabel(L, anchorWorld, labelWorld, withLine, li) {
+  L.mesh.visible = true;
+  L.mesh.position.copy(labelWorld);
+  L.mesh.quaternion.copy(camQ);
+  const arr = leaderGeo.attributes.position.array;
+  if (withLine) { anchorWorld.toArray(arr, li * 6); labelWorld.toArray(arr, li * 6 + 3); }
+  else for (let k = 0; k < 6; k++) arr[li * 6 + k] = 0;
+}
+let loopErr = false;
+renderer.setAnimationLoop(() => { try { loop(); } catch (e) { if (!loopErr) console.error(e); loopErr = true; } });
+function loop() {
   const t = performance.now(), dt = Math.min(0.05, (t - last) / 1000);
   last = t; clock.t += dt; bootT += dt;
   scene.updateMatrixWorld();
@@ -909,52 +1576,102 @@ renderer.setAnimationLoop(() => {
   } else {
     for (const p of parts) p.hover = 0;
     if (deskHover?.kind === 'part') deskHover.part.hover = 1;
-    const bi = deskHover?.kind === 'button' ? deskHover.bi : -1;
-    if (bi !== ctrl.hover) { ctrl.hover = bi; drawCtrl(); }
-    renderer.domElement.style.cursor = deskHover && deskHover.kind !== 'base' ? 'pointer' : '';
+    const r = deskHover?.kind === 'ui' ? deskHover.region : null;
+    if (r !== ctrl.hover) { ctrl.hover = r; drawCtrl(); }
+    renderer.domElement.style.cursor = deskHover && deskHover.kind !== 'base' && (deskHover.kind !== 'ui' || deskHover.region) ? 'pointer' : '';
   }
 
   // Aufziehen weich animieren (während der Zwei-Hand-Geste direkt)
   if (!inputs.some(i => i.grab?.type === 'explode')) state.explode += (state.explodeTarget - state.explode) * (1 - Math.exp(-dt * 5));
   const k = 1 - Math.exp(-dt * 10);
+  const fadeIn = Math.min(1, bootT * 1.5);
   for (const p of parts) {
     if (!p.grabbed && !p.detached) {
       target.copy(p.home).addScaledVector(p.dir, state.explode);
       p.group.position.lerp(target, k);
       p.group.quaternion.slerp(tq.identity(), k);
     }
-    const u = p.holoMat.uniforms;
-    u.uTime.value = clock.t;
-    u.uOpacity.value = Math.min(1, bootT * 1.5);
-    const sel = p === selected;
-    u.uColor.value.copy(sel ? GOLD : HOLO);
-    u.uGlow.value = sel ? 1.8 : p.hover ? 1.7 : 1;
+    const flowDim = state.flow && state.explode < 0.2 && !selected;
+    const sel = p === selected, dim = (selected || flowDim) && !sel && !p.hover;
+    for (const m of p.mats) {
+      const u = m.uniforms;
+      u.uTime.value = clock.t;
+      u.uOpacity.value = fadeIn;
+      u.uColor.value.copy(sel ? GOLD : HOLO);
+      u.uGlow.value = sel ? 1.8 : p.hover ? 1.7 : flowDim ? 0.22 : dim ? 0.45 : 1;
+    }
     p.edgeMat.color.set(sel ? 0xffc76b : p.hover ? 0xc8f6ff : 0x7fe9ff);
-    p.edgeMat.opacity = (sel || p.hover ? 0.9 : 0.5) * Math.min(1, bootT * 1.5);
-    if (p.rotor) p.rotor.rotation.y += dt * (4 + state.explode * 6);
+    p.edgeMat.opacity = (sel || p.hover ? 0.9 : flowDim ? 0.12 : dim ? 0.2 : 0.5) * fadeIn;
+    for (const s of p.spins || []) s.g.rotation.y += dt * s.speed;
   }
   if (state.spin && !inputs.some(i => i.grab?.type === 'model' || i.grab?.type === 'scale')) modelRoot.rotation.y += dt * 0.35;
   baseSpin.rotation.y += dt * 0.6;
+  baseTicks.rotation.y -= dt * 0.15;
   ps4.position.y = 0.03 + state.explode * 0.14; // beim Aufziehen anheben, damit die Bodenwanne über dem Sockel bleibt
+
+  // Flüsse
+  const assembled = Math.max(0, 1 - state.explode / 0.15);
+  flowOrder.forEach((key, i) => {
+    if (!key) return;
+    const f = FLOWS[key], on = state.flow === i && assembled > 0;
+    f.points.visible = on;
+    f.points.material.size = 0.014 * Math.sqrt(S / 1.3) / (renderer.xr.isPresenting ? 1.2 : Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); // ca. 14 mm große Punkte
+    if (on) updateFlow(f, clock.t, assembled);
+  });
+  dimLines.visible = state.dims && assembled > 0.5;
 
   // Panels folgen dem Modell (ohne dessen Skalierung)
   ui.position.copy(modelRoot.position);
   ui.quaternion.copy(modelRoot.quaternion);
   const half = 0.14 * S;
-  ctrl.mesh.position.set(-(half + 0.3), 0.2, 0.06); ctrl.mesh.rotation.set(0, 0.5, 0);
-  info.mesh.position.set(half + 0.34, 0.22, 0.06); info.mesh.rotation.set(0, -0.5, 0);
+  ctrl.mesh.position.set(-(half + 0.45), 0.2, 0.08); ctrl.mesh.rotation.set(0, 0.5, 0);
+  info.mesh.position.set(half + 0.42, 0.22, 0.08); info.mesh.rotation.set(0, -0.5, 0);
+
+  // Beschriftungen
+  modelRoot.updateMatrixWorld(true);
+  viewerCam().getWorldQuaternion(camQ);
+  modelRoot.getWorldQuaternion(mq);
+  for (const L of labels) L.mesh.visible = false;
+  const showParts = state.labels && state.explode > 0.3;
+  parts.forEach((p, li) => {
+    if (!showParts || p === selected || !p.group.visible) { placeLabel(p.label, _w, _w, false, li); p.label.mesh.visible = false; return; }
+    _w.copy(p.center).applyMatrix4(p.group.matrixWorld);
+    _o.copy(p.center).applyMatrix4(p.group.matrix).applyMatrix4(ps4.matrix); // Position im modelRoot-Raum
+    _o.y = 0; if (_o.lengthSq() < 1e-4) _o.set(li % 2 ? 1 : -1, 0, 0);
+    _o.normalize().applyQuaternion(mq);
+    const lw = _w.clone().addScaledVector(_o, 0.07).add(V(0, 0.012, 0));
+    placeLabel(p.label, _w, lw, true, li);
+    p.label.mesh.material.opacity = Math.min(1, (state.explode - 0.3) * 3);
+  });
+  let li = parts.length;
+  for (const [i, key] of flowOrder.entries()) {
+    if (!key) continue;
+    for (const { L, pos } of FLOWS[key].labelObjs) {
+      if (state.flow === i && assembled > 0.5) { _w.copy(pos); ps4.localToWorld(_w); placeLabel(L, _w, _w, false, li); }
+      else placeLabel(L, _w, _w, false, li), L.mesh.visible = false;
+      li++;
+    }
+  }
+  for (const { L, pos } of dimLabels) {
+    if (dimLines.visible) { _w.copy(pos); ps4.localToWorld(_w); placeLabel(L, _w, _w, false, li); }
+    else placeLabel(L, _w, _w, false, li), L.mesh.visible = false;
+    li++;
+  }
+  leaderGeo.attributes.position.needsUpdate = true;
+  leaders.material.opacity = 0.55 * Math.min(1, Math.max(0, (state.explode - 0.3) * 3));
 
   // Namensschild
-  if (selected) {
-    const b = new THREE.Box3().setFromObject(selected.group);
-    b.getCenter(tagPos); tagPos.y = b.max.y + 0.035;
+  if (selected && selected.group.visible) {
+    tagPos.copy(selected.center).applyMatrix4(selected.group.matrixWorld);
+    const b = selected.localBox.clone().applyMatrix4(selected.group.matrixWorld);
+    tagPos.y = b.max.y + 0.03;
     tagPanel.mesh.visible = true;
     tagPanel.mesh.position.copy(tagPos);
-    tagPanel.mesh.quaternion.copy(viewerCam().getWorldQuaternion(tq));
+    tagPanel.mesh.quaternion.copy(camQ);
   } else tagPanel.mesh.visible = false;
 
   renderer.render(scene, camera);
-});
+}
 </script>
 </body>
 </html>
