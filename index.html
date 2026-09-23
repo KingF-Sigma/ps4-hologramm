@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PS4 Hologramm</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080d; overflow: hidden; font-family: system-ui, "Segoe UI", sans-serif; color: #bfefff; }
+  canvas { display: block; }
+  #overlay { position: fixed; left: 16px; top: 16px; max-width: 380px; background: rgba(4, 18, 28, .82); border: 1px solid #1f6f8f; border-radius: 10px; padding: 14px 16px; backdrop-filter: blur(4px); }
+  #overlay h1 { margin: 0 0 6px; font-size: 18px; letter-spacing: .08em; color: #6fe6ff; }
+  #overlay p { margin: 6px 0; font-size: 13px; line-height: 1.45; }
+  #overlay ul { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+  #start { width: 100%; padding: 12px; margin-top: 6px; font-size: 16px; font-weight: 600; letter-spacing: .05em; color: #021019; background: #4fd8ff; border: 0; border-radius: 8px; cursor: pointer; }
+  #start:disabled { background: #33505c; color: #8aa; cursor: default; }
+  #msg { margin-top: 8px; font-size: 12px; color: #ffb35c; }
+  #hide { position: absolute; right: 10px; top: 8px; background: none; border: 0; color: #6fe6ff; font-size: 16px; cursor: pointer; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="overlay">
+  <button id="hide" title="Ausblenden">✕</button>
+  <h1>PS4 · HOLOGRAMM</h1>
+  <p>Setz die Quest auf und drück den Knopf. Das Hologramm erscheint vor dir im Raum (Passthrough).</p>
+  <ul>
+    <li><b>Teil greifen:</b> Daumen + Zeigefinger an einem Teil zusammendrücken, rausziehen, drehen, loslassen. Wenn du ein Teil nah an seinem Platz loslässt, rastet es wieder ein.</li>
+    <li><b>Aufziehen:</b> mit beiden Händen gleichzeitig ins Modell greifen und die Hände auseinanderziehen. Zusammenschieben baut die PS4 wieder zusammen.</li>
+    <li><b>Verschieben/Drehen:</b> den leuchtenden Sockelring greifen. Mit zwei Händen am Ring skalierst du.</li>
+    <li><b>Knöpfe:</b> mit dem Zeigefinger antippen oder aus der Ferne anpinchen.</li>
+  </ul>
+  <button id="start">Hologramm starten</button>
+  <div id="msg"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ---------------------------------------------------------------- Grundgerüst
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const deskBg = new THREE.Color(0x05080d);
+scene.background = deskBg;
+const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 50);
+camera.position.set(0.25, 1.45, 1.25);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.15, 0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4048, 1.3));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(0.6, 2.5, 1.2);
+scene.add(sun);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- Materialien
+const clock = { t: 0 };
+const HOLO = new THREE.Color(0x3fd6ff), GOLD = new THREE.Color(0xffb341);
+
+function makeHolo() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: HOLO.clone() }, uTime: { value: 0 }, uGlow: { value: 1 }, uOpacity: { value: 1 } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vW;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uTime; uniform float uGlow; uniform float uOpacity;
+      varying vec3 vN; varying vec3 vW;
+      void main() {
+        vec3 v = normalize(cameraPosition - vW);
+        float fr = pow(1.0 - abs(dot(normalize(vN), v)), 2.0);
+        float scan = smoothstep(0.55, 1.0, sin(vW.y * 260.0 - uTime * 3.0) * 0.5 + 0.5);
+        float flick = 0.94 + 0.06 * sin(uTime * 37.0 + vW.x * 40.0);
+        float a = (0.07 + fr * 0.7 + scan * 0.07) * uGlow * uOpacity * flick;
+        gl_FragColor = vec4(uColor * (0.55 + fr * 0.9) + scan * 0.06, a);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  });
+}
+function makeEdge() {
+  return new THREE.LineBasicMaterial({ color: 0x7fe9ff, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
+}
+
+const REAL_DEF = {
+  black:  { color: 0x141518, roughness: 0.75 },
+  gloss:  { color: 0x08080a, roughness: 0.08, metalness: 0.1 },
+  pcb:    { color: 0x1c5a2e, roughness: 0.55 },
+  pcb2:   { color: 0x103a1f, roughness: 0.5 },
+  chip:   { color: 0x1b1b1d, roughness: 0.45 },
+  die:    { color: 0x4a4e66, roughness: 0.15, metalness: 0.6 },
+  metal:  { color: 0xaeb3ba, roughness: 0.35, metalness: 0.9 },
+  alu:    { color: 0xd4d8dc, roughness: 0.3, metalness: 0.85 },
+  copper: { color: 0xc8703a, roughness: 0.28, metalness: 1 },
+  port:   { color: 0x0a0a0c, roughness: 0.6 },
+  psu:    { color: 0x2b2d31, roughness: 0.6, metalness: 0.3 },
+  label:  { color: 0xe6e6e0, roughness: 0.8 },
+  disc:   { color: 0xdad9ec, roughness: 0.1, metalness: 1 },
+  cap:    { color: 0x2b3b8f, roughness: 0.4, metalness: 0.4 },
+  light:  { color: 0x1d5cff, emissive: 0x2f7dff, emissiveIntensity: 2.2, roughness: 0.3 },
+};
+const REAL = {};
+for (const [k, d] of Object.entries(REAL_DEF)) REAL[k] = new THREE.MeshStandardMaterial({ ...d, side: THREE.DoubleSide });
+
+// ---------------------------------------------------------------- Modell-Aufbau
+// Einheiten in mm, Original-PS4 (CUH-1000): 275 × 53 × 305 mm. Vorne = +z.
+const W2 = 137.5, D2 = 152.5, LEAN = 12 / 53, A = Math.atan(LEAN);
+const zF = y => D2 + y * LEAN, zB = y => -D2 + y * LEAN;
+
+const modelRoot = new THREE.Group();
+let S = 1.3;
+modelRoot.scale.setScalar(S);
+modelRoot.position.set(0, 1.0, 0);
+scene.add(modelRoot);
+const ps4 = new THREE.Group();
+ps4.scale.setScalar(0.001);
+ps4.position.y = 0.03;
+modelRoot.add(ps4);
+
+const parts = [];
+const allMeshes = [];
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+function makePart(id, name, home, dir, info) {
+  const group = new THREE.Group();
+  group.position.copy(home);
+  ps4.add(group);
+  const p = { id, name, group, home: home.clone(), dir, info, meshes: [], detached: false, grabbed: false,
+              holoMat: makeHolo(), edgeMat: makeEdge(), hover: 0 };
+  parts.push(p);
+  return p;
+}
+function add(p, geom, x, y, z, real, rot) {
+  const m = new THREE.Mesh(geom, p.holoMat);
+  m.position.set(x - p.home.x, y - p.home.y, z - p.home.z);
+  if (rot) m.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
+  geom.computeBoundingBox();
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geom, 25), p.edgeMat);
+  m.add(e);
+  m.userData = { part: p, real: REAL[real], edges: e };
+  p.group.add(m);
+  p.meshes.push(m);
+  allMeshes.push(m);
+  return m;
+}
+const box = (p, w, h, d, x, y, z, real, rot) => add(p, new THREE.BoxGeometry(w, h, d), x, y, z, real, rot);
+const cyl = (p, r, h, x, y, z, real, rot, seg = 24) => add(p, new THREE.CylinderGeometry(r, r, h, seg), x, y, z, real, rot);
+function sideGeom(y0, y1, t) { // Seitenwand als Parallelogramm (die PS4 ist schräg)
+  const s = new THREE.Shape();
+  s.moveTo(zB(y0), y0); s.lineTo(zF(y0), y0); s.lineTo(zF(y1), y1); s.lineTo(zB(y1), y1); s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false });
+  g.rotateY(-Math.PI / 2); g.translate(t / 2, 0, 0);
+  return g;
+}
+const slant = (p, w, y0, y1, t, front, real) => {
+  const ym = (y0 + y1) / 2, h = (y1 - y0) / Math.cos(A);
+  return box(p, w, h, t, 0, ym, front ? zF(ym) - t / 2 : zB(ym) + t / 2, real, [A, 0, 0]);
+};
+
+// --- Unteres Gehäuse
+{
+  const p = makePart('bottom', 'Unteres Gehäuse', V(0, 12, 0), V(0, -130, 0), {
+    sub: 'Bodenwanne aus Kunststoff',
+    text: 'Die untere Hälfte trägt alles: Mainboard, Lüfter und Festplattenschacht sind hier verschraubt. Zwischen oberer und unterer Hälfte liegt die dunkle Fuge, durch die die PS4 Luft ansaugt.',
+    facts: ['Maße komplett: 275 × 53 × 305 mm', 'Gewicht der ganzen Konsole: ca. 2,8 kg', 'Luft kommt seitlich rein und hinten raus'] });
+  box(p, 271, 2, 301, 0, 1, 0, 'black');
+  slant(p, 275, 2, 25, 2.5, true, 'black');
+  slant(p, 275, 2, 25, 2.5, false, 'black');
+  add(p, sideGeom(2, 25, 2.5), W2 - 1.25, 0, 0, 'black');
+  add(p, sideGeom(2, 25, 2.5), -W2 + 1.25, 0, 0, 'black');
+  // Fuge (Luftschlitz) zwischen den Hälften
+  box(p, 261, 4 / Math.cos(A), 1.5, 0, 27, zF(27) - 8, 'port', [A, 0, 0]);
+  box(p, 261, 4 / Math.cos(A), 1.5, 0, 27, zB(27) + 8, 'port', [A, 0, 0]);
+  box(p, 1.5, 4, 288, W2 - 7, 27, 27 * LEAN, 'port');
+  box(p, 1.5, 4, 288, -W2 + 7, 27, 27 * LEAN, 'port');
+  for (let i = 0; i < 8; i++) box(p, 220, 1.2, 3, 0, 2.6, -112 + i * 32, 'black');
+  for (const [x, z] of [[-110, -120], [110, -120], [-110, 120], [110, 120]]) cyl(p, 9, 2, x, -1, z, 'port');
+}
+// --- Oberes Gehäuse
+{
+  const p = makePart('top', 'Oberes Gehäuse', V(0, 41, 0), V(0, 270, 0), {
+    sub: 'Haube mit Hochglanz- und Mattfläche',
+    text: 'Das typische Design der ersten PS4: links ein Hochglanz-Streifen (darunter steckt die Festplatte), rechts die große matte Fläche. Dazwischen läuft die Lichtleiste, die in der Farbe des Controllers leuchtet.',
+    facts: ['Lichtleiste: blau = an, weiß = Ruhemodus-Übergang, orange = Ruhemodus', 'Vorne: Schlitz für Discs + Touch-Tasten für Power und Auswurf', 'Hinten: Lüftungsgitter'] });
+  box(p, 182.5, 2.5, 305, 46.25, 51.75, 51.75 * LEAN, 'black');
+  box(p, 88.5, 2.5, 305, -93.25, 51.75, 51.75 * LEAN, 'gloss');
+  box(p, 4, 1.6, 298, -47, 52, 52 * LEAN, 'light');
+  slant(p, 275, 29, 50.5, 2.5, true, 'black');
+  slant(p, 275, 29, 50.5, 2.5, false, 'black');
+  add(p, sideGeom(29, 50.5, 2.5), W2 - 1.25, 0, 0, 'black');
+  add(p, sideGeom(29, 50.5, 2.5), -W2 + 1.25, 0, 0, 'black');
+  box(p, 125, 3, 1.2, 50, 38, zF(38) + 0.3, 'port', [A, 0, 0]);          // Disc-Schlitz
+  for (let x = -120; x <= 120; x += 16) box(p, 3, 15, 3, x, 39.75, zB(39.75) - 0.6, 'port', [A, 0, 0]); // Lüftungsgitter
+}
+// --- Mainboard
+{
+  const p = makePart('board', 'Mainboard', V(0, 6, -5), V(0, -55, 0), {
+    sub: 'Hauptplatine (SAA-001)',
+    text: 'Auf der Hauptplatine sitzt alles, was rechnet: die APU in der Mitte, drumherum der Grafikspeicher. Die Southbridge mit eigenem kleinen ARM-Prozessor kümmert sich um USB, Festplatte und Downloads im Ruhemodus.',
+    facts: ['Hinten: HDMI, Gigabit-LAN, optischer Audioausgang, AUX (PS-Kamera)', 'Southbridge mit eigenem ARM-Kern für Hintergrund-Downloads', '16 Speicherchips: 8 oben, 8 auf der Unterseite'] });
+  box(p, 255, 1.6, 280, 0, 6, -5, 'pcb');
+  box(p, 20, 2, 20, -60, 7.8, -50, 'chip');                                  // Southbridge
+  for (const [w, d, x, z] of [[10, 8, -85, -20], [8, 8, 70, 60], [14, 10, -30, 80], [9, 9, 95, -40], [12, 6, -100, 40], [7, 7, 60, -95]])
+    box(p, w, 1.5, d, x, 7.5, z, 'chip');
+  for (let i = 0; i < 6; i++) cyl(p, 3, 7, -20 + i * 9, 10.3, 70, 'cap', null, 12);
+  for (let i = 0; i < 4; i++) cyl(p, 3, 7, 80, 10.3, -10 + i * 9, 'cap', null, 12);
+  box(p, 15, 6, 10, -30, 9.8, -138, 'metal');   // HDMI
+  box(p, 16, 13, 14, -5, 13.3, -136, 'metal');  // LAN
+  box(p, 9, 9, 12, 18, 11.3, -137, 'port');     // optisch
+  box(p, 10, 8, 10, 38, 10.8, -138, 'port');    // AUX
+  for (const [x, z] of [[-115, -130], [115, -130], [-115, 120], [115, 120], [-40, 30], [80, -60]]) cyl(p, 4, 3, x, 8.3, z, 'metal', null, 12);
+}
+// --- APU
+{
+  const p = makePart('apu', 'APU – CPU + Grafik', V(20, 8, 15), V(0, 40, 0), {
+    sub: 'AMD-Chip "Liverpool"',
+    text: 'Das Herz der PS4: Prozessor und Grafikchip sitzen auf einem einzigen Stück Silizium. Deshalb heißt das Ding APU. Es wird richtig heiß und hängt deshalb direkt am Kupferblock des Kühlkörpers.',
+    facts: ['CPU: 8 Jaguar-Kerne mit 1,6 GHz', 'GPU: 18 Compute Units, 800 MHz, 1,84 TFLOPS', 'Gefertigt in 28 nm bei TSMC'] });
+  box(p, 42, 1.2, 42, 20, 7.4, 15, 'pcb2');
+  box(p, 19, 0.9, 18.5, 20, 8.45, 15, 'die');
+  for (const [x, z] of [[4, 0], [36, 0], [4, 30], [36, 30]]) box(p, 3, 0.8, 3, x, 8.4, z, 'chip');
+}
+// --- GDDR5
+{
+  const p = makePart('ram', 'GDDR5-Arbeitsspeicher', V(20, 7.4, 15), V(0, -25, 0), {
+    sub: '8 GB, gemeinsam für CPU und Grafik',
+    text: 'Die PS4 hat keinen getrennten Grafikspeicher: CPU und GPU teilen sich 8 GB schnellen GDDR5-Speicher. Das war 2013 für eine Konsole richtig viel und machte das Entwickeln einfacher.',
+    facts: ['8 GB GDDR5, 176 GB/s', '16 Chips à 512 MB (hier die 8 auf der Oberseite)', 'Ein Teil ist fürs Betriebssystem reserviert'] });
+  const pos = [[-42, -14], [-42, 14], [42, -14], [42, 14], [-14, -42], [14, -42], [-14, 42], [14, 42]];
+  for (const [dx, dz] of pos) {
+    const flip = Math.abs(dz) > 30;
+    box(p, flip ? 14 : 12, 1.2, flip ? 12 : 14, 20 + dx, 7.4, 15 + dz, 'chip');
+  }
+}
+// --- Kühlkörper
+{
+  const p = makePart('cooler', 'Kühlkörper', V(25, 18, -50), V(0, 95, 0), {
+    sub: 'Kupferblock, Heatpipes, Alu-Lamellen',
+    text: 'Der Kupferblock liegt mit Wärmeleitpaste direkt auf der APU. Vier Heatpipes ziehen die Wärme nach hinten zu den Aluminium-Lamellen, und dort bläst der Lüfter sie aus der Konsole raus.',
+    facts: ['Alte PS4 laut? Meist ist die Wärmeleitpaste ausgetrocknet', 'Heatpipes: Kupferrohre mit verdampfender Flüssigkeit innen', 'Staub zwischen den Lamellen = heiß + laut'] });
+  box(p, 46, 5, 46, 20, 11.8, 15, 'copper');
+  for (const x of [5, 15, 25, 35]) cyl(p, 3, 118, x, 16, -44, 'copper', [Math.PI / 2, 0, 0], 12);
+  for (let x = -35; x <= 90; x += 5) box(p, 1, 17, 40, x, 19.5, -110, 'alu');
+  box(p, 128, 1, 40, 27.5, 28.5, -110, 'alu');
+}
+// --- Lüfter
+{
+  const p = makePart('fan', 'Lüfter', V(-80, 17, -85), V(-70, 60, -50), {
+    sub: 'Radiallüfter (Blower), ca. 85 mm',
+    text: 'Der Lüfter saugt die Luft von oben und unten an und drückt sie seitlich durch die Lamellen des Kühlkörpers nach hinten raus. Je heißer die APU, desto schneller dreht er.',
+    facts: ['Bauart: Radiallüfter (wie ein Hamsterrad)', 'Hauptquelle für den berühmten "Düsenjet"-Sound', 'Reinigen: Gehäuse öffnen, Staub vorsichtig raus'] });
+  add(p, new THREE.CylinderGeometry(42, 42, 16, 40, 1, true), -80, 17, -85, 'black');
+  cyl(p, 42, 1.5, -80, 9.75, -85, 'black', null, 40);
+  add(p, new THREE.RingGeometry(18, 42, 40), -80, 25, -85, 'black', [-Math.PI / 2, 0, 0]);
+  box(p, 30, 16, 36, -52, 17, -108, 'black');
+  const rotor = new THREE.Group();
+  rotor.position.set(0, 0, 0);
+  p.group.add(rotor);
+  const blades = [cyl(p, 14, 12, -80, 17, -85, 'black', null, 20)];
+  for (let i = 0; i < 24; i++) {
+    const a = i / 24 * Math.PI * 2;
+    blades.push(box(p, 14, 12, 1.2, -80 + Math.cos(a) * 26, 17, -85 + Math.sin(a) * 26, 'black', [0, -a + 0.5, 0]));
+  }
+  for (const b of blades) rotor.add(b);
+  p.rotor = rotor;
+}
+// --- Abschirmblech
+{
+  const p = makePart('shield', 'Abschirmblech', V(0, 30, -5), V(0, 150, 0), {
+    sub: 'Metallplatte über dem Mainboard',
+    text: 'Das Blech schirmt die Elektronik gegen Funkstörungen ab (EMV) und macht die Konsole stabiler. Netzteil und Laufwerk liegen oben drauf.',
+    facts: ['Aus dünnem Stahlblech', 'Ohne Abschirmung würde die PS4 z. B. WLAN stören', 'Mit vielen Schrauben am Rahmen befestigt'] });
+  box(p, 250, 1, 275, 0, 30, -5, 'metal');
+  for (let i = 0; i < 6; i++) box(p, 220, 1.5, 4, 0, 30.9, -115 + i * 44, 'metal');
+  box(p, 250, 7, 1, 0, 26.5, -142.5, 'metal');
+  box(p, 250, 7, 1, 0, 26.5, 132.5, 'metal');
+}
+// --- Netzteil
+{
+  const p = makePart('psu', 'Netzteil', V(40, 41, -72), V(0, 205, -40), {
+    sub: 'Internes Netzteil, kein Ziegel am Kabel',
+    text: 'Anders als bei der Xbox One steckt das Netzteil in der Konsole. Es macht aus 230 V Wechselstrom die 12 V Gleichstrom, die das Mainboard braucht.',
+    facts: ['Nennleistung ca. 250 W', 'Im Spiel zieht die PS4 etwa 140 – 150 W', 'Hinten: Buchse für das Kaltgerätekabel (Achter-Stecker)'] });
+  box(p, 175, 18, 115, 40, 41, -72, 'psu');
+  for (let i = 0; i < 6; i++) box(p, 150, 0.6, 3, 40, 50.3, -120 + i * 12, 'port');
+  box(p, 60, 0.4, 36, 20, 50.2, -38, 'label');
+  box(p, 22, 12, 10, 110, 41, -133, 'port');
+}
+// --- Blu-ray
+{
+  const p = makePart('bd', 'Blu-ray-Laufwerk', V(55, 41, 72), V(30, 205, 70), {
+    sub: 'Slot-in-Laufwerk für BD, DVD und CD',
+    text: 'Discs werden direkt eingezogen, es gibt keine Schublade. Ein blau-violetter Laser liest die winzigen Spuren einer Blu-ray. Spiele werden aber trotzdem auf die Festplatte installiert.',
+    facts: ['Blu-ray mit 6-facher Geschwindigkeit, DVD 8-fach', 'Laser: 405 nm (blau-violett)', 'Eine Blu-ray fasst 25 bzw. 50 GB'] });
+  box(p, 128, 17, 126, 55, 41, 72, 'alu');
+  box(p, 128, 17, 3, 55, 41, 136.5, 'black');
+  box(p, 110, 2.5, 1, 55, 41, 138.3, 'port');
+  cyl(p, 60, 1.2, 55, 41, 72, 'disc', null, 48);
+  cyl(p, 7.5, 2.5, 55, 41, 72, 'metal', null, 20);
+}
+// --- Festplatte
+{
+  const p = makePart('hdd', 'Festplatte', V(-100, 17, 62), V(-160, 10, 70), {
+    sub: '2,5 Zoll, 500 GB, im Metallrahmen',
+    text: 'Die Festplatte steckt unter dem Hochglanz-Deckel und lässt sich tauschen: Deckel abschieben, eine Schraube raus, Rahmen rausziehen. Viele haben später eine SSD eingebaut.',
+    facts: ['500 GB, 5400 Umdrehungen pro Minute', 'Tauschen erlaubt, max. 9,5 mm Bauhöhe', 'Anschluss: SATA'] });
+  box(p, 76, 2, 106, -100, 11.5, 62, 'metal');
+  box(p, 2, 10, 106, -138, 16.5, 62, 'metal');
+  box(p, 2, 10, 106, -62, 16.5, 62, 'metal');
+  box(p, 70, 9.5, 100, -100, 17.3, 62, 'alu');
+  box(p, 50, 0.3, 58, -100, 22.2, 58, 'label');
+  cyl(p, 26, 0.3, -100, 22.1, 70, 'disc', null, 40);
+  box(p, 30, 6, 3, -100, 17, 10.5, 'port');
+}
+// --- WLAN
+{
+  const p = makePart('wifi', 'WLAN/Bluetooth-Modul', V(-95, 36, -115), V(-70, 110, -70), {
+    sub: 'Funkmodul mit Antennenkabeln',
+    text: 'Das kleine Modul macht WLAN für das Internet und Bluetooth für die Controller. Die dünnen Kabel führen zu Antennen im Gehäuse.',
+    facts: ['WLAN 802.11 b/g/n, nur 2,4 GHz', 'Bluetooth 2.1 für DualShock 4 und Headsets', 'Für Online-Spiele ist LAN-Kabel besser'] });
+  box(p, 34, 1.5, 26, -95, 35, -115, 'pcb');
+  box(p, 16, 2.5, 14, -98, 37, -115, 'metal');
+  cyl(p, 1.1, 80, -130, 36.5, -110, 'port', [0, 0, Math.PI / 2], 8);
+  cyl(p, 1.1, 80, -130, 36.5, -120, 'port', [0, 0, Math.PI / 2], 8);
+}
+// --- Front-USB
+{
+  const p = makePart('usb', 'Front-USB-Platine', V(-30, 26, 144), V(0, 0, 110), {
+    sub: '2 × USB 3.0 vorne',
+    text: 'Die kleine Platine vorne hält die beiden USB-Anschlüsse in der Fuge zwischen den Gehäusehälften. Da lädt man den Controller oder steckt einen Stick für Updates rein.',
+    facts: ['2 × USB 3.0', 'Laden des DualShock 4 auch im Ruhemodus', 'Power- und Auswurf-Taste sind Touch-Sensoren'] });
+  box(p, 70, 1.5, 16, -30, 24, 142, 'pcb');
+  box(p, 14, 6, 14, -45, 27.5, 145, 'metal');
+  box(p, 14, 6, 14, -15, 27.5, 145, 'metal');
+}
+
+for (const p of parts) {
+  const b = new THREE.Box3().setFromObject(p.group);
+  const s = b.getSize(new THREE.Vector3());
+  p.volume = s.x * s.y * s.z;
+}
+
+// ---------------------------------------------------------------- Sockel (Projektor)
+const baseGroup = new THREE.Group();
+modelRoot.add(baseGroup);
+const addMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+const baseDisk = new THREE.Mesh(new THREE.CircleGeometry(0.24, 64).rotateX(-Math.PI / 2), addMat(0x3fd6ff, 0.07));
+const baseRing = new THREE.Mesh(new THREE.RingGeometry(0.232, 0.246, 96).rotateX(-Math.PI / 2), addMat(0x6fe6ff, 0.8));
+const baseSpin = new THREE.Group();
+for (let i = 0; i < 3; i++) {
+  const arc = new THREE.Mesh(new THREE.RingGeometry(0.205, 0.214, 48, 1, i * 2.094, 1.5).rotateX(-Math.PI / 2), addMat(0x6fe6ff, 0.55));
+  baseSpin.add(arc);
+}
+const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.1, 64, 1, true).translate(0, 0.05, 0), new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: HOLO } },
+  vertexShader: 'varying float vY; void main(){ vY = position.y / 0.1; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ gl_FragColor = vec4(uColor, (1.0 - vY) * 0.18); }',
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+baseGroup.add(baseDisk, baseRing, baseSpin, cone);
+
+// ---------------------------------------------------------------- Panels (Canvas-Texturen)
+const ui = new THREE.Group();
+scene.add(ui);
+
+function makePanel(wm, hm, wpx, hpx) {
+  const canvas = document.createElement('canvas');
+  canvas.width = wpx; canvas.height = hpx;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wm, hm), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  mesh.renderOrder = 10;
+  ui.add(mesh);
+  return { canvas, ctx: canvas.getContext('2d'), tex, mesh, wm, hm, buttons: [], hover: -1, flash: -1 };
+}
+function frame(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(2, 22, 34, 0.72)';
+  ctx.fillRect(6, 6, w - 12, h - 12);
+  ctx.strokeStyle = 'rgba(111, 230, 255, 0.55)'; ctx.lineWidth = 3;
+  ctx.strokeRect(6, 6, w - 12, h - 12);
+  ctx.strokeStyle = '#6fe6ff'; ctx.lineWidth = 7;
+  const c = 34;
+  for (const [x, y, dx, dy] of [[6, 6, 1, 1], [w - 6, 6, -1, 1], [6, h - 6, 1, -1], [w - 6, h - 6, -1, -1]]) {
+    ctx.beginPath(); ctx.moveTo(x + dx * c, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * c); ctx.stroke();
+  }
+}
+function wrap(ctx, text, x, y, maxW, lh) {
+  let line = '';
+  for (const word of text.split(' ')) {
+    const t = line ? line + ' ' + word : word;
+    if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = word; }
+    else line = t;
+  }
+  if (line) { ctx.fillText(line, x, y); y += lh; }
+  return y;
+}
+
+// Steuer-Panel
+const ctrl = makePanel(0.22, 0.36, 440, 720);
+const state = { explode: 1.3, explodeTarget: 0, holo: true, spin: false };
+ctrl.buttons = [
+  { id: 'explode', label: () => state.explodeTarget > 0.5 ? 'ZUSAMMENBAUEN' : 'AUFZIEHEN' },
+  { id: 'reset', label: () => 'TEILE ZURÜCK' },
+  { id: 'mode', label: () => state.holo ? 'ANSICHT: HOLOGRAMM' : 'ANSICHT: ECHT' },
+  { id: 'spin', label: () => state.spin ? 'DREHEN: AN' : 'DREHEN: AUS' },
+  { id: 'bigger', label: () => 'GRÖSSER  +' },
+  { id: 'smaller', label: () => 'KLEINER  −' },
+  { id: 'here', label: () => 'ZU MIR HOLEN' },
+].map((b, i) => ({ ...b, x: 40, y: 110 + i * 84, w: 360, h: 68 }));
+function drawCtrl() {
+  const { ctx, canvas } = ctrl;
+  frame(ctx, canvas.width, canvas.height);
+  ctx.fillStyle = '#6fe6ff'; ctx.font = '600 34px system-ui, sans-serif';
+  ctx.fillText('STEUERUNG', 40, 70);
+  ctrl.buttons.forEach((b, i) => {
+    const on = ctrl.flash === i, hov = ctrl.hover === i;
+    ctx.fillStyle = on ? 'rgba(255,179,65,0.55)' : hov ? 'rgba(79,216,255,0.35)' : 'rgba(79,216,255,0.12)';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = on ? '#ffb341' : '#4fd8ff'; ctx.lineWidth = 3;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = on ? '#fff2d8' : '#d8f7ff'; ctx.font = '600 28px system-ui, sans-serif';
+    ctx.fillText(b.label(), b.x + 22, b.y + 45);
+  });
+  ctrl.tex.needsUpdate = true;
+}
+
+// Info-Panel
+const info = makePanel(0.36, 0.25, 900, 625);
+let selected = null;
+function drawInfo() {
+  const { ctx, canvas } = info;
+  frame(ctx, canvas.width, canvas.height);
+  const x = 44;
+  if (!selected) {
+    ctx.fillStyle = '#6fe6ff'; ctx.font = '600 46px system-ui, sans-serif';
+    ctx.fillText('PLAYSTATION 4 · CUH-1000', x, 84);
+    ctx.fillStyle = '#bfefff'; ctx.font = '30px system-ui, sans-serif';
+    let y = wrap(ctx, 'Greif mit Daumen und Zeigefinger in ein Teil, um es rauszunehmen und dir anzuschauen. Mit beiden Händen gleichzeitig reingreifen und auseinanderziehen, um die Konsole aufzuziehen.', x, 150, 810, 42);
+    y += 14;
+    ctx.fillStyle = '#ffb341';
+    wrap(ctx, 'Den Sockelring greifen: verschieben und drehen. Zwei Hände am Ring: größer oder kleiner ziehen.', x, y, 810, 42);
+  } else {
+    const i = selected.info;
+    ctx.fillStyle = '#ffb341'; ctx.font = '600 50px system-ui, sans-serif';
+    ctx.fillText(selected.name.toUpperCase(), x, 84);
+    ctx.fillStyle = '#6fe6ff'; ctx.font = 'italic 28px system-ui, sans-serif';
+    ctx.fillText(i.sub, x, 128);
+    ctx.fillStyle = '#d8f7ff'; ctx.font = '28px system-ui, sans-serif';
+    let y = wrap(ctx, i.text, x, 180, 810, 38) + 12;
+    ctx.font = '26px system-ui, sans-serif';
+    for (const f of i.facts) { ctx.fillStyle = '#4fd8ff'; ctx.fillText('▸', x, y); ctx.fillStyle = '#bfefff'; y = wrap(ctx, f, x + 30, y, 780, 34) + 4; }
+  }
+  info.tex.needsUpdate = true;
+}
+
+// Namensschild über dem ausgewählten Teil
+const tagPanel = makePanel(0.2, 0.045, 600, 135);
+scene.add(tagPanel.mesh);
+tagPanel.mesh.visible = false;
+tagPanel.mesh.material.depthTest = false;
+tagPanel.mesh.renderOrder = 20;
+function drawTag() {
+  const { ctx, canvas } = tagPanel;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!selected) return;
+  ctx.fillStyle = 'rgba(40, 24, 2, 0.75)'; ctx.fillRect(4, 4, canvas.width - 8, canvas.height - 8);
+  ctx.strokeStyle = '#ffb341'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+  ctx.fillStyle = '#ffe2b0'; ctx.font = '600 52px system-ui, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(selected.name, canvas.width / 2, 86, canvas.width - 30);
+  ctx.textAlign = 'left';
+  tagPanel.tex.needsUpdate = true;
+}
+
+function select(p) {
+  if (selected === p) return;
+  selected = p;
+  drawInfo(); drawTag();
+}
+drawCtrl(); drawInfo();
+
+// ---------------------------------------------------------------- Aktionen
+function setHolo(on) {
+  state.holo = on;
+  for (const m of allMeshes) {
+    m.material = on ? m.userData.part.holoMat : m.userData.real;
+    m.userData.edges.visible = on;
+  }
+  scene.environment = on ? null : envMap;
+}
+function clickButton(id) {
+  blip(1200, 0.06);
+  if (id === 'explode') state.explodeTarget = state.explodeTarget > 0.5 ? 0 : 1;
+  if (id === 'reset') for (const p of parts) if (!p.grabbed) p.detached = false;
+  if (id === 'mode') setHolo(!state.holo);
+  if (id === 'spin') state.spin = !state.spin;
+  if (id === 'bigger') setScale(S * 1.2);
+  if (id === 'smaller') setScale(S / 1.2);
+  if (id === 'here') placeInFront();
+  const i = ctrl.buttons.findIndex(b => b.id === id);
+  ctrl.flash = i; drawCtrl();
+  setTimeout(() => { if (ctrl.flash === i) { ctrl.flash = -1; drawCtrl(); } }, 180);
+}
+function setScale(s) { S = THREE.MathUtils.clamp(s, 0.3, 5); modelRoot.scale.setScalar(S); }
+
+function viewerCam() { return renderer.xr.isPresenting ? renderer.xr.getCamera() : camera; }
+function placeInFront() {
+  const cam = viewerCam();
+  const pos = new THREE.Vector3(), q = new THREE.Quaternion();
+  cam.matrixWorld.decompose(pos, q, new THREE.Vector3());
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q); fwd.y = 0;
+  if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
+  fwd.normalize();
+  modelRoot.position.copy(pos).addScaledVector(fwd, 0.6);
+  modelRoot.position.y = Math.max(0.3, pos.y - 0.5);
+  modelRoot.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
+}
+
+// ---------------------------------------------------------------- Sound
+let actx = null;
+function ensureAudio() { try { actx = actx || new AudioContext(); actx.resume(); } catch (e) {} }
+function blip(f = 880, d = 0.08, type = 'sine', vol = 0.05) {
+  if (!actx) return;
+  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  o.frequency.exponentialRampToValueAtTime(f * 1.5, t + d);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(actx.destination);
+  o.start(t); o.stop(t + d + 0.02);
+}
+function haptic(inp, strength = 0.4, ms = 30) {
+  try { inp.source?.gamepad?.hapticActuators?.[0]?.pulse(strength, ms); } catch (e) {}
+}
+
+// ---------------------------------------------------------------- Eingabe (Hände + Controller)
+const NEAR = 0.025;
+const tv = new THREE.Vector3(), tv2 = new THREE.Vector3(), tq = new THREE.Quaternion(), tm = new THREE.Matrix4(), inv = new THREE.Matrix4();
+const ONE = new THREE.Vector3(1, 1, 1);
+const raycaster = new THREE.Raycaster();
+
+const inputs = [0, 1].map(i => {
+  const ray = renderer.xr.getController(i), grip = renderer.xr.getControllerGrip(i), hand = renderer.xr.getHand(i);
+  scene.add(ray, grip, hand);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(0, 0, 0), V(0, 0, -1)]),
+    new THREE.LineBasicMaterial({ color: 0x6fe6ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ray.add(line);
+  const cursor = new THREE.Mesh(new THREE.SphereGeometry(0.006, 12, 8), addMat(0xffffff, 0.9));
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.005, 12, 8), addMat(0x6fe6ff, 0.9));
+  scene.add(cursor, dot);
+  const inp = { i, ray, grip, hand, line, cursor, dot, source: null, isHand: false, pinching: false, grab: null, poke: false, hoverPart: null, hoverBase: false };
+  ray.addEventListener('connected', e => { inp.source = e.data; inp.isHand = !!e.data.hand; });
+  ray.addEventListener('disconnected', () => { release(inp); inp.source = null; inp.isHand = false; });
+  ray.addEventListener('selectstart', () => { if (!inp.isHand) press(inp); });
+  ray.addEventListener('selectend', () => { if (!inp.isHand) release(inp); });
+  ray.addEventListener('squeezestart', () => { if (!inp.isHand) press(inp); });
+  ray.addEventListener('squeezeend', () => { if (!inp.isHand) release(inp); });
+  return inp;
+});
+
+function joint(inp, name) { return inp.hand.joints?.[name]; }
+function pinchPoint(inp, out) {
+  const t = joint(inp, 'thumb-tip'), f = joint(inp, 'index-finger-tip');
+  if (!t || !f) return false;
+  t.getWorldPosition(out); f.getWorldPosition(tv2);
+  out.add(tv2).multiplyScalar(0.5);
+  return true;
+}
+function nearPoint(inp, out) {
+  if (inp.isHand) return pinchPoint(inp, out);
+  inp.grip.getWorldPosition(out);
+  return true;
+}
+function grabPose(inp, far, out) {
+  if (far) return out.copy(inp.ray.matrixWorld);
+  if (inp.isHand) {
+    const w = joint(inp, 'wrist');
+    const p = new THREE.Vector3();
+    pinchPoint(inp, p);
+    if (w) w.getWorldQuaternion(tq); else tq.identity();
+    return out.compose(p, tq, ONE);
+  }
+  return out.copy(inp.grip.matrixWorld);
+}
+function yawPose(M, prevYaw) { // nur Position + Drehung um die Hochachse
+  const p = new THREE.Vector3(), q = new THREE.Quaternion();
+  M.decompose(p, q, tv);
+  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+  const yaw = Math.hypot(f.x, f.z) > 0.2 ? Math.atan2(f.x, f.z) : prevYaw;
+  return { yaw, m: new THREE.Matrix4().compose(p, new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), yaw), ONE) };
+}
+
+function partDistance(p, pt) {
+  let best = Infinity;
+  for (const m of p.meshes) {
+    inv.copy(m.matrixWorld).invert();
+    tv.copy(pt).applyMatrix4(inv).clamp(m.geometry.boundingBox.min, m.geometry.boundingBox.max).applyMatrix4(m.matrixWorld);
+    best = Math.min(best, tv.distanceTo(pt));
+  }
+  return best;
+}
+function nearestPart(pt, maxD) {
+  let best = null, bd = Infinity, bv = Infinity;
+  for (const p of parts) {
+    if (p.grabbed) continue;
+    const d = Math.max(0, partDistance(p, pt) - 0.004);
+    if (d > maxD) continue;
+    if (d < bd - 1e-4 || (Math.abs(d - bd) <= 1e-4 && p.volume < bv)) { best = p; bd = d; bv = p.volume; }
+  }
+  return best;
+}
+function onBase(pt) {
+  tv.copy(pt); modelRoot.worldToLocal(tv);
+  return Math.hypot(tv.x, tv.z) < 0.27 && tv.y > -0.04 && tv.y < 0.025;
+}
+function inModel(pt, pad) {
+  const b = new THREE.Box3().setFromObject(ps4).expandByScalar(pad);
+  return b.containsPoint(pt);
+}
+function rayHit(origin, dir) {
+  raycaster.set(origin, dir);
+  const hits = raycaster.intersectObjects([ctrl.mesh, baseDisk, ...allMeshes.filter(m => !m.userData.part.grabbed)], false);
+  for (const h of hits) {
+    if (h.object === ctrl.mesh) {
+      const px = h.uv.x * ctrl.canvas.width, py = (1 - h.uv.y) * ctrl.canvas.height;
+      const bi = ctrl.buttons.findIndex(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
+      return { kind: 'button', bi, dist: h.distance };
+    }
+    if (h.object === baseDisk) return { kind: 'base', dist: h.distance };
+    return { kind: 'part', part: h.object.userData.part, dist: h.distance };
+  }
+  return null;
+}
+function inputRay(inp) {
+  inp.ray.matrixWorld.decompose(tv, tq, tv2);
+  return { o: tv.clone(), d: V(0, 0, -1).applyQuaternion(tq).normalize() };
+}
+
+const now = () => performance.now();
+function fresh(g) { return g && g.type === 'part' && now() - g.t0 < 1200 && g.moved < 0.05; }
+
+function press(inp) {
+  if (inp.grab) return;
+  scene.updateMatrixWorld();
+  const other = inputs[1 - inp.i];
+  const pt = new THREE.Vector3();
+  if (nearPoint(inp, pt)) {
+    const p = nearestPart(pt, NEAR);
+    if (other.grab?.type === 'explode') return;
+    if ((p || inModel(pt, 0.03)) && fresh(other.grab)) return startExplode(inp, other);
+    if (p) return startPartGrab(inp, p, false);
+    if (onBase(pt)) return startModelGrab(inp, false);
+  }
+  const { o, d } = inputRay(inp);
+  const hit = rayHit(o, d);
+  if (!hit) return;
+  if (hit.kind === 'button') { if (hit.bi >= 0) clickButton(ctrl.buttons[hit.bi].id); inp.grab = { type: 'ui' }; return; }
+  if (hit.kind === 'base') return startModelGrab(inp, true);
+  if (hit.kind === 'part') return startPartGrab(inp, hit.part, true);
+}
+
+function release(inp) {
+  const g = inp.grab;
+  if (!g) return;
+  inp.grab = null;
+  const other = inputs[1 - inp.i];
+  if (g.type === 'part') {
+    const p = g.part;
+    p.grabbed = false;
+    const home = p.home.clone().addScaledVector(p.dir, state.explode);
+    const ang = 2 * Math.acos(Math.min(1, Math.abs(p.group.quaternion.w)));
+    if (p.group.position.distanceTo(home) < 35 && ang < 0.6) { p.detached = false; blip(660, 0.1, 'triangle'); haptic(inp, 0.6, 50); }
+    else p.detached = true;
+  } else if (g.type === 'explode') {
+    other.grab = null;
+    if (state.explode < 0.06) state.explodeTarget = 0;
+    blip(520, 0.08);
+  } else if (g.type === 'scale') {
+    other.grab = null;
+    startModelGrab(other, g.far);
+  }
+}
+
+function startPartGrab(inp, p, far) {
+  grabPose(inp, far, tm);
+  p.group.updateWorldMatrix(true, false);
+  inp.grab = { type: 'part', part: p, far, t0: now(), moved: 0, start: p.group.getWorldPosition(new THREE.Vector3()),
+               offset: new THREE.Matrix4().copy(tm).invert().multiply(p.group.matrixWorld),
+               prev: { detached: p.detached, pos: p.group.position.clone(), quat: p.group.quaternion.clone() } };
+  p.grabbed = true;
+  select(p);
+  blip(880, 0.07); haptic(inp);
+}
+function startModelGrab(inp, far) {
+  const other = inputs[1 - inp.i];
+  if (other.grab?.type === 'model') {
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    nearPoint(inp, a); nearPoint(other, b);
+    const g = { type: 'scale', far, d0: Math.max(0.05, a.distanceTo(b)), s0: S, c0: a.clone().add(b).multiplyScalar(0.5), p0: modelRoot.position.clone() };
+    inp.grab = other.grab = g;
+    blip(990, 0.1); haptic(inp); haptic(other);
+    return;
+  }
+  grabPose(inp, far, tm);
+  const y = yawPose(tm, 0);
+  inp.grab = { type: 'model', far, yaw: y.yaw, offset: y.m.clone().invert().multiply(modelRoot.matrixWorld) };
+  blip(740, 0.07); haptic(inp);
+}
+function startExplode(inp, other) {
+  const og = other.grab, p = og.part;
+  p.grabbed = false;
+  p.detached = og.prev.detached;
+  p.group.position.copy(og.prev.pos); p.group.quaternion.copy(og.prev.quat);
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  nearPoint(inp, a); nearPoint(other, b);
+  const g = { type: 'explode', d0: a.distanceTo(b), f0: state.explode, last: Math.round(state.explode * 10) };
+  inp.grab = other.grab = g;
+  blip(440, 0.12, 'sawtooth', 0.03); haptic(inp); haptic(other);
+}
+
+function updateGrabs() {
+  const done = new Set();
+  for (const inp of inputs) {
+    const g = inp.grab;
+    if (!g || done.has(g)) continue;
+    done.add(g);
+    if (g.type === 'part') {
+      grabPose(inp, g.far, tm);
+      tm.multiply(g.offset);
+      ps4.updateWorldMatrix(true, false);
+      inv.copy(ps4.matrixWorld).invert();
+      tm.premultiply(inv);
+      tm.decompose(g.part.group.position, g.part.group.quaternion, tv);
+      g.moved = Math.max(g.moved, g.part.group.getWorldPosition(tv).distanceTo(g.start));
+    } else if (g.type === 'model') {
+      grabPose(inp, g.far, tm);
+      const y = yawPose(tm, g.yaw);
+      g.yaw = y.yaw;
+      y.m.multiply(g.offset).decompose(modelRoot.position, modelRoot.quaternion, tv);
+    } else if (g.type === 'scale' || g.type === 'explode') {
+      const other = inputs[1 - inp.i];
+      const a = new THREE.Vector3(), b = new THREE.Vector3();
+      if (!nearPoint(inp, a) || !nearPoint(other, b)) continue;
+      const d = a.distanceTo(b);
+      if (g.type === 'scale') {
+        setScale(g.s0 * d / g.d0);
+        const c = a.add(b).multiplyScalar(0.5);
+        modelRoot.position.copy(c).add(g.p0.clone().sub(g.c0).multiplyScalar(S / g.s0));
+      } else {
+        state.explode = state.explodeTarget = THREE.MathUtils.clamp(g.f0 + (d - g.d0) / 0.35, 0, 1.4);
+        const step = Math.round(state.explode * 10);
+        if (step !== g.last) { g.last = step; blip(300 + step * 60, 0.03, 'square', 0.015); haptic(inp, 0.15, 10); haptic(other, 0.15, 10); }
+      }
+    }
+  }
+}
+
+function updateHandPinch() {
+  for (const inp of inputs) {
+    if (!inp.isHand) continue;
+    const t = joint(inp, 'thumb-tip'), f = joint(inp, 'index-finger-tip');
+    if (!t || !f) continue;
+    const d = t.getWorldPosition(tv).distanceTo(f.getWorldPosition(tv2));
+    if (!inp.pinching && d < 0.018) { inp.pinching = true; press(inp); }
+    else if (inp.pinching && d > 0.035) { inp.pinching = false; release(inp); }
+  }
+}
+
+function updatePoke() { // Knöpfe mit der Zeigefingerspitze antippen
+  for (const inp of inputs) {
+    if (!inp.isHand) continue;
+    const f = joint(inp, 'index-finger-tip');
+    if (!f) continue;
+    f.getWorldPosition(tv);
+    ctrl.mesh.worldToLocal(tv);
+    const u = tv.x / ctrl.wm + 0.5, v = 0.5 - tv.y / ctrl.hm;
+    const px = u * ctrl.canvas.width, py = v * ctrl.canvas.height;
+    const bi = ctrl.buttons.findIndex(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
+    if (bi >= 0 && Math.abs(tv.z) < 0.012 && !inp.poke && !inp.grab) {
+      inp.poke = true;
+      clickButton(ctrl.buttons[bi].id);
+      haptic(inp);
+    } else if (bi < 0 || Math.abs(tv.z) > 0.03) inp.poke = false;
+  }
+}
+
+function updateHover() {
+  for (const p of parts) p.hover = 0;
+  let baseHover = false, btnHover = -1;
+  for (const inp of inputs) {
+    inp.line.visible = inp.cursor.visible = inp.dot.visible = false;
+    if (!inp.source) continue;
+    const pt = new THREE.Vector3();
+    const hasPt = nearPoint(inp, pt);
+    let nearSomething = false;
+    if (hasPt) {
+      inp.dot.visible = inp.isHand;
+      inp.dot.position.copy(pt);
+      if (!inp.grab) {
+        const p = nearestPart(pt, NEAR);
+        if (p) { p.hover = 1; nearSomething = true; }
+        else if (onBase(pt)) { baseHover = true; nearSomething = true; }
+      }
+      nearSomething ||= inModel(pt, 0.08);
+      inp.dot.material.color.set(nearSomething && !inp.grab ? 0xffb341 : 0x6fe6ff);
+    }
+    if (inp.grab && !inp.grab.far) continue;
+    if (inp.isHand && nearSomething) continue;
+    const { o, d } = inputRay(inp);
+    const hit = inp.grab ? null : rayHit(o, d);
+    inp.line.visible = true;
+    inp.line.scale.z = hit ? hit.dist : (inp.grab ? 0.3 : 0.6);
+    inp.line.material.opacity = inp.isHand ? 0.25 : 0.5;
+    if (hit) {
+      inp.cursor.visible = true;
+      inp.cursor.position.copy(o).addScaledVector(d, hit.dist);
+      if (hit.kind === 'part') hit.part.hover = 1;
+      if (hit.kind === 'base') baseHover = true;
+      if (hit.kind === 'button') btnHover = hit.bi;
+    }
+  }
+  baseRing.material.opacity = baseHover ? 1 : 0.7;
+  baseDisk.material.opacity = baseHover ? 0.16 : 0.07;
+  if (btnHover !== ctrl.hover) { ctrl.hover = btnHover; drawCtrl(); }
+}
+
+// ---------------------------------------------------------------- Desktop-Maus (zum Testen am PC)
+const mouse = { down: null };
+renderer.domElement.addEventListener('pointerdown', e => { mouse.down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!mouse.down || Math.hypot(e.clientX - mouse.down[0], e.clientY - mouse.down[1]) > 5) return;
+  ensureAudio();
+  const hit = mouseHit(e);
+  if (hit?.kind === 'button' && hit.bi >= 0) clickButton(ctrl.buttons[hit.bi].id);
+  else if (hit?.kind === 'part') select(hit.part);
+  else select(null);
+});
+let deskHover = null;
+renderer.domElement.addEventListener('pointermove', e => { deskHover = mouseHit(e); });
+function mouseHit(e) {
+  const ndc = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  return rayHit(raycaster.ray.origin.clone(), raycaster.ray.direction.clone());
+}
+addEventListener('keydown', e => { if (e.key === 'e') clickButton('explode'); if (e.key === 'h') clickButton('mode'); });
+
+// ---------------------------------------------------------------- XR-Start
+const startBtn = document.getElementById('start'), msg = document.getElementById('msg'), overlay = document.getElementById('overlay');
+document.getElementById('hide').onclick = () => overlay.style.display = 'none';
+let xrMode = null;
+(async () => {
+  if (!navigator.xr) { startBtn.disabled = true; msg.textContent = window.isSecureContext ? 'Dieser Browser kann kein WebXR. Am PC kannst du das Modell mit der Maus ansehen.' : 'WebXR braucht HTTPS. Auf der Quest die https://…:8443-Adresse benutzen.'; return; }
+  if (await navigator.xr.isSessionSupported('immersive-ar')) xrMode = 'immersive-ar';
+  else if (await navigator.xr.isSessionSupported('immersive-vr')) { xrMode = 'immersive-vr'; msg.textContent = 'Kein Passthrough verfügbar, startet in VR.'; }
+  else { startBtn.disabled = true; msg.textContent = 'Kein VR-Headset gefunden. Am PC: Maus zum Drehen, Klick auf Teile, Taste E = aufziehen.'; }
+})();
+let placeFrames = -1;
+startBtn.onclick = async () => {
+  ensureAudio();
+  try {
+    const session = await navigator.xr.requestSession(xrMode, { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] });
+    await renderer.xr.setSession(session);
+    scene.background = xrMode === 'immersive-ar' ? null : deskBg;
+    overlay.style.display = 'none';
+    placeFrames = 0;
+    state.explode = 1.3; state.explodeTarget = 0; bootT = 0;
+    session.addEventListener('end', () => { overlay.style.display = ''; scene.background = deskBg; for (const i of inputs) release(i); });
+  } catch (err) { msg.textContent = 'Start fehlgeschlagen: ' + err.message; }
+};
+
+// ---------------------------------------------------------------- Loop
+let last = performance.now(), bootT = 0;
+const target = new THREE.Vector3(), tagPos = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  const t = performance.now(), dt = Math.min(0.05, (t - last) / 1000);
+  last = t; clock.t += dt; bootT += dt;
+  scene.updateMatrixWorld();
+
+  if (renderer.xr.isPresenting) {
+    if (placeFrames >= 0 && ++placeFrames > 4) { placeInFront(); placeFrames = -1; }
+    updateHandPinch();
+    updateGrabs();
+    updatePoke();
+    updateHover();
+  } else {
+    for (const p of parts) p.hover = 0;
+    if (deskHover?.kind === 'part') deskHover.part.hover = 1;
+    const bi = deskHover?.kind === 'button' ? deskHover.bi : -1;
+    if (bi !== ctrl.hover) { ctrl.hover = bi; drawCtrl(); }
+    renderer.domElement.style.cursor = deskHover && deskHover.kind !== 'base' ? 'pointer' : '';
+  }
+
+  // Aufziehen weich animieren (während der Zwei-Hand-Geste direkt)
+  if (!inputs.some(i => i.grab?.type === 'explode')) state.explode += (state.explodeTarget - state.explode) * (1 - Math.exp(-dt * 5));
+  const k = 1 - Math.exp(-dt * 10);
+  for (const p of parts) {
+    if (!p.grabbed && !p.detached) {
+      target.copy(p.home).addScaledVector(p.dir, state.explode);
+      p.group.position.lerp(target, k);
+      p.group.quaternion.slerp(tq.identity(), k);
+    }
+    const u = p.holoMat.uniforms;
+    u.uTime.value = clock.t;
+    u.uOpacity.value = Math.min(1, bootT * 1.5);
+    const sel = p === selected;
+    u.uColor.value.copy(sel ? GOLD : HOLO);
+    u.uGlow.value = sel ? 1.8 : p.hover ? 1.7 : 1;
+    p.edgeMat.color.set(sel ? 0xffc76b : p.hover ? 0xc8f6ff : 0x7fe9ff);
+    p.edgeMat.opacity = (sel || p.hover ? 0.9 : 0.5) * Math.min(1, bootT * 1.5);
+    if (p.rotor) p.rotor.rotation.y += dt * (4 + state.explode * 6);
+  }
+  if (state.spin && !inputs.some(i => i.grab?.type === 'model' || i.grab?.type === 'scale')) modelRoot.rotation.y += dt * 0.35;
+  baseSpin.rotation.y += dt * 0.6;
+  ps4.position.y = 0.03 + state.explode * 0.14; // beim Aufziehen anheben, damit die Bodenwanne über dem Sockel bleibt
+
+  // Panels folgen dem Modell (ohne dessen Skalierung)
+  ui.position.copy(modelRoot.position);
+  ui.quaternion.copy(modelRoot.quaternion);
+  const half = 0.14 * S;
+  ctrl.mesh.position.set(-(half + 0.3), 0.2, 0.06); ctrl.mesh.rotation.set(0, 0.5, 0);
+  info.mesh.position.set(half + 0.34, 0.22, 0.06); info.mesh.rotation.set(0, -0.5, 0);
+
+  // Namensschild
+  if (selected) {
+    const b = new THREE.Box3().setFromObject(selected.group);
+    b.getCenter(tagPos); tagPos.y = b.max.y + 0.035;
+    tagPanel.mesh.visible = true;
+    tagPanel.mesh.position.copy(tagPos);
+    tagPanel.mesh.quaternion.copy(viewerCam().getWorldQuaternion(tq));
+  } else tagPanel.mesh.visible = false;
+
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
